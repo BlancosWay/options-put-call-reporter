@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from reporter.models import AppConfig, SymbolConfig, Thresholds
 
@@ -38,6 +39,17 @@ def _thresholds(data: dict[str, Any]) -> Thresholds:
     return Thresholds(**values)
 
 
+def _is_barchart_put_call_url(url: str) -> bool:
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if hostname is None:
+        return False
+    hostname = hostname.lower().rstrip(".")
+    if hostname != "barchart.com" and not hostname.endswith(".barchart.com"):
+        return False
+    return parsed.path.rstrip("/").endswith("/put-call-ratios")
+
+
 def _symbols(data: dict[str, Any]) -> list[SymbolConfig]:
     raw_symbols = data.get("symbols")
     if not isinstance(raw_symbols, list) or not raw_symbols:
@@ -49,7 +61,7 @@ def _symbols(data: dict[str, Any]) -> list[SymbolConfig]:
             raise ConfigError("Each symbol entry must be an object")
         symbol = _require_string(raw, "symbol").upper()
         url = _require_string(raw, "url")
-        if "barchart.com" not in url or "/put-call-ratios" not in url:
+        if not _is_barchart_put_call_url(url):
             raise ConfigError(f"Symbol {symbol} must use a Barchart put-call-ratios URL")
         if symbol in seen:
             raise ConfigError(f"Duplicate symbol '{symbol}'")

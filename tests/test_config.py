@@ -59,6 +59,24 @@ def test_load_config_rejects_missing_symbols(tmp_path: Path) -> None:
         load_config(config_path)
 
 
+def test_load_config_rejects_non_barchart_host_with_barchart_substring(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(
+        config_path,
+        {
+            "symbols": [
+                {
+                    "symbol": "NOW",
+                    "url": "https://evilbarchart.com/stocks/quotes/now/put-call-ratios",
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ConfigError, match="Barchart"):
+        load_config(config_path)
+
+
 def test_load_config_rejects_non_barchart_url(tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     write_config(config_path, {"symbols": [{"symbol": "NOW", "url": "https://example.com/now"}]})
