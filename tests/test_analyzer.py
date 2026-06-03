@@ -95,3 +95,38 @@ def test_analyze_snapshot_creates_commentary_and_monthly_signals() -> None:
     assert analysis.monthly_signals[2].signal is Signal.BEARISH_HEDGING
     assert "2 bullish" in analysis.commentary
     assert "1 bearish" in analysis.commentary
+
+
+def test_analyze_snapshot_commentary_reports_neutral_when_neutral_signals_dominate() -> None:
+    snapshot = Snapshot(
+        symbol="MSFT",
+        url="https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        metrics=TopMetrics("07/29/26", 31.62, 33.28, 61.17, 85.0),
+        rows=[
+            row("06/18/26 (m)", 0.90, 0.80, 111014),
+            row("07/17/26 (m)", 0.95, 0.85, 69554),
+            row("08/21/26 (m)", 0.50, 0.80, 42000),
+        ],
+    )
+
+    analysis = analyze_snapshot(snapshot, thresholds(), months=12)
+
+    assert "neutral overall" in analysis.commentary
+
+
+def test_analyze_snapshot_commentary_reports_mixed_when_bullish_and_mixed_tie_for_lead() -> None:
+    snapshot = Snapshot(
+        symbol="MSFT",
+        url="https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        metrics=TopMetrics("07/29/26", 31.62, 33.28, 61.17, 85.0),
+        rows=[
+            row("06/18/26 (m)", 0.50, 0.80, 111014),
+            row("07/17/26 (m)", 0.80, 1.20, 69554),
+        ],
+    )
+
+    analysis = analyze_snapshot(snapshot, thresholds(), months=12)
+
+    assert "mixed overall" in analysis.commentary

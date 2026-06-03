@@ -47,12 +47,15 @@ def _commentary(symbol: str, signals: list[MonthlySignal]) -> str:
     bullish, neutral, mixed, bearish = _count_signals(signals)
     if not signals:
         return f"{symbol}: no expiration rows were available for analysis."
-    if bullish > bearish and bullish >= mixed:
-        tone = "bullish overall"
-    elif bearish > bullish and bearish >= mixed:
-        tone = "bearish or hedging-heavy overall"
-    else:
-        tone = "mixed overall"
+    counts = {
+        "bullish overall": bullish,
+        "neutral overall": neutral,
+        "mixed overall": mixed,
+        "bearish or hedging-heavy overall": bearish,
+    }
+    highest_count = max(counts.values())
+    leading_tones = [tone for tone, count in counts.items() if count == highest_count]
+    tone = leading_tones[0] if len(leading_tones) == 1 else "mixed overall"
     return f"{symbol}: {tone} with {bullish} bullish, {neutral} neutral, {mixed} mixed, and {bearish} bearish monthly signals."
 
 
