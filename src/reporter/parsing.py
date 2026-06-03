@@ -21,26 +21,35 @@ def parse_percent(value: str | None) -> float | None:
     cleaned = value.strip().replace("%", "")
     if cleaned in {"", "—", "-", "N/A"}:
         return None
-    return float(cleaned.replace(",", ""))
+    try:
+        return float(cleaned.replace(",", ""))
+    except ValueError as exc:
+        raise ParseError(f"Cannot parse percent from '{value}'") from exc
 
 
 def parse_int(value: str) -> int:
     cleaned = value.strip().replace(",", "")
     if cleaned in {"", "—", "-", "N/A"}:
         raise ParseError(f"Cannot parse integer from '{value}'")
-    return int(cleaned)
+    try:
+        return int(cleaned)
+    except ValueError as exc:
+        raise ParseError(f"Cannot parse integer from '{value}'") from exc
 
 
 def parse_float(value: str) -> float:
     cleaned = value.strip().replace(",", "")
     if cleaned in {"", "—", "-", "N/A"}:
         raise ParseError(f"Cannot parse float from '{value}'")
-    return float(cleaned)
+    try:
+        return float(cleaned)
+    except ValueError as exc:
+        raise ParseError(f"Cannot parse float from '{value}'") from exc
 
 
 def parse_expiration_label(value: str) -> ParsedExpiration:
     cleaned = " ".join(value.strip().split())
-    match = re.match(r"^(?P<month>\d{2})/(?P<day>\d{2})/(?P<year>\d{2})(?:\s+\((?P<kind>[mw])\))?$", cleaned)
+    match = re.match(r"^(?P<month>\d{2})/(?P<day>\d{2})/(?P<year>\d{2})\s+\((?P<kind>[mw])\)$", cleaned)
     if not match:
         raise ParseError(f"Cannot parse expiration label '{value}'")
     try:
