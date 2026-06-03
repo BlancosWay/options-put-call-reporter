@@ -46,6 +46,8 @@ def _thresholds(data: dict[str, Any]) -> Thresholds:
 
 def _is_barchart_put_call_url(url: str) -> bool:
     parsed = urlparse(url)
+    if parsed.scheme != "https":
+        return False
     hostname = parsed.hostname
     if hostname is None:
         return False

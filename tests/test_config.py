@@ -92,6 +92,83 @@ def test_load_config_rejects_non_barchart_url(tmp_path: Path) -> None:
         load_config(config_path)
 
 
+def test_load_config_rejects_ftp_barchart_url(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(
+        config_path,
+        {
+            "symbols": [
+                {
+                    "symbol": "NOW",
+                    "url": "ftp://www.barchart.com/stocks/quotes/now/put-call-ratios",
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ConfigError, match="Barchart"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_scheme_relative_barchart_url(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(
+        config_path,
+        {
+            "symbols": [
+                {
+                    "symbol": "NOW",
+                    "url": "//www.barchart.com/stocks/quotes/now/put-call-ratios",
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ConfigError, match="Barchart"):
+        load_config(config_path)
+
+
+def test_load_config_uppercases_lowercase_symbol(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(
+        config_path,
+        {
+            "symbols": [
+                {
+                    "symbol": "now",
+                    "url": "https://www.barchart.com/stocks/quotes/now/put-call-ratios",
+                }
+            ]
+        },
+    )
+
+    config = load_config(config_path)
+
+    assert config.symbols[0].symbol == "NOW"
+
+
+def test_load_config_rejects_duplicate_symbols_after_uppercase(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(
+        config_path,
+        {
+            "symbols": [
+                {
+                    "symbol": "now",
+                    "url": "https://www.barchart.com/stocks/quotes/now/put-call-ratios",
+                },
+                {
+                    "symbol": "NOW",
+                    "url": "https://www.barchart.com/stocks/quotes/now/put-call-ratios",
+                },
+            ]
+        },
+    )
+
+    with pytest.raises(ConfigError, match="Duplicate"):
+        load_config(config_path)
+
+
 def test_load_config_rejects_boolean_gmail_smtp_port(tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     write_config(config_path, {"gmail_smtp_port": True})
