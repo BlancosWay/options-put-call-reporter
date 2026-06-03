@@ -37,6 +37,13 @@ def write_config(path: Path, overrides: dict | None = None) -> None:
     path.write_text(json.dumps(config), encoding="utf-8")
 
 
+def write_config_with_threshold(path: Path, key: str, value: object) -> None:
+    write_config(path)
+    config = json.loads(path.read_text(encoding="utf-8"))
+    config["thresholds"][key] = value
+    path.write_text(json.dumps(config), encoding="utf-8")
+
+
 def test_load_config_returns_typed_values(tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     write_config(config_path)
@@ -82,4 +89,28 @@ def test_load_config_rejects_non_barchart_url(tmp_path: Path) -> None:
     write_config(config_path, {"symbols": [{"symbol": "NOW", "url": "https://example.com/now"}]})
 
     with pytest.raises(ConfigError, match="Barchart"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_boolean_gmail_smtp_port(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(config_path, {"gmail_smtp_port": True})
+
+    with pytest.raises(ConfigError, match="integer"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_boolean_float_threshold(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config_with_threshold(config_path, "strong_bullish_volume_max", True)
+
+    with pytest.raises(ConfigError, match="numeric"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_float_min_total_volume_for_commentary(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config_with_threshold(config_path, "min_total_volume_for_commentary", 1000.9)
+
+    with pytest.raises(ConfigError, match="integer"):
         load_config(config_path)

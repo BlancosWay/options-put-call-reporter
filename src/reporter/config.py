@@ -21,7 +21,7 @@ def _require_string(data: dict[str, Any], key: str) -> str:
 
 def _require_int(data: dict[str, Any], key: str) -> int:
     value = data.get(key)
-    if not isinstance(value, int):
+    if not isinstance(value, int) or isinstance(value, bool):
         raise ConfigError(f"Config value '{key}' must be an integer")
     return value
 
@@ -33,9 +33,14 @@ def _thresholds(data: dict[str, Any]) -> Thresholds:
     values: dict[str, float | int] = {}
     for key in Thresholds.__dataclass_fields__:
         value = raw.get(key)
-        if not isinstance(value, (int, float)):
+        if key == "min_total_volume_for_commentary":
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise ConfigError(f"Threshold '{key}' must be an integer")
+            values[key] = value
+            continue
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise ConfigError(f"Threshold '{key}' must be numeric")
-        values[key] = int(value) if key == "min_total_volume_for_commentary" else float(value)
+        values[key] = float(value)
     return Thresholds(**values)
 
 
