@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "options-put-call-reporter"
+version = "0.1.0"
+description = "Daily Barchart put/call ratio report generator"
+requires-python = ">=3.11"
+dependencies = [
+  "playwright>=1.46,<2"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9"
+]
+
+[project.scripts]
+options-put-call-report = "reporter.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

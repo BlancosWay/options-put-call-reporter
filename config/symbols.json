@@ -1,0 +1,31 @@
+{
+  "archive_dir": "archive",
+  "database_path": "data/history.sqlite3",
+  "report_time_local": "14:30",
+  "keychain_service": "options-put-call-reporter:gmail-app-password",
+  "gmail_smtp_host": "smtp.gmail.com",
+  "gmail_smtp_port": 587,
+  "thresholds": {
+    "strong_bullish_volume_max": 0.35,
+    "strong_bullish_oi_max": 0.7,
+    "bullish_volume_max": 0.7,
+    "bullish_oi_max": 0.9,
+    "bearish_volume_min": 1.1,
+    "bearish_oi_min": 1.25,
+    "mixed_oi_min": 1.0,
+    "mixed_oi_max": 1.25,
+    "neutral_volume_min": 0.7,
+    "neutral_volume_max": 1.1,
+    "neutral_oi_max": 1.1,
+    "min_total_volume_for_commentary": 1000
+  },
+  "symbols": [
+    {"symbol": "META", "url": "https://www.barchart.com/stocks/quotes/meta/put-call-ratios"},
+    {"symbol": "GOOG", "url": "https://www.barchart.com/stocks/quotes/goog/put-call-ratios"},
+    {"symbol": "MSFT", "url": "https://www.barchart.com/stocks/quotes/msft/put-call-ratios"},
+    {"symbol": "NFLX", "url": "https://www.barchart.com/stocks/quotes/nflx/put-call-ratios"},
+    {"symbol": "NOW", "url": "https://www.barchart.com/stocks/quotes/now/put-call-ratios"},
+    {"symbol": "AAOI", "url": "https://www.barchart.com/stocks/quotes/aaoi/put-call-ratios"},
+    {"symbol": "LITE", "url": "https://www.barchart.com/stocks/quotes/lite/put-call-ratios"}
+  ]
+}

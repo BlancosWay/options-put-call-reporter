@@ -1,1 +1,11 @@
 .worktrees/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+archive/
+data/
+config/email.local.json
+playwright-report/
+test-results/
