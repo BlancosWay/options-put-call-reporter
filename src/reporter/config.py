@@ -44,7 +44,7 @@ def _thresholds(data: dict[str, Any]) -> Thresholds:
     return Thresholds(**values)
 
 
-def _is_barchart_put_call_url(url: str) -> bool:
+def _is_barchart_put_call_url(url: str, symbol: str) -> bool:
     parsed = urlparse(url)
     if parsed.scheme != "https":
         return False
@@ -54,7 +54,8 @@ def _is_barchart_put_call_url(url: str) -> bool:
     hostname = hostname.lower().rstrip(".")
     if hostname != "barchart.com" and not hostname.endswith(".barchart.com"):
         return False
-    return parsed.path.rstrip("/").endswith("/put-call-ratios")
+    expected_path = f"/stocks/quotes/{symbol.lower()}/put-call-ratios"
+    return parsed.path.rstrip("/").lower() == expected_path
 
 
 def _symbols(data: dict[str, Any]) -> list[SymbolConfig]:
@@ -68,8 +69,11 @@ def _symbols(data: dict[str, Any]) -> list[SymbolConfig]:
             raise ConfigError("Each symbol entry must be an object")
         symbol = _require_string(raw, "symbol").upper()
         url = _require_string(raw, "url")
-        if not _is_barchart_put_call_url(url):
-            raise ConfigError(f"Symbol {symbol} must use a Barchart put-call-ratios URL")
+        if not _is_barchart_put_call_url(url, symbol):
+            raise ConfigError(
+                f"Symbol {symbol} must use a Barchart URL matching "
+                f"/stocks/quotes/{symbol.lower()}/put-call-ratios"
+            )
         if symbol in seen:
             raise ConfigError(f"Duplicate symbol '{symbol}'")
         seen.add(symbol)
