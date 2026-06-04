@@ -76,23 +76,10 @@ class HistoryStore:
 
     def prior_snapshots(self, symbol: str, captured_at: datetime) -> dict[str, Snapshot | None]:
         return {
-            "previous_day": self._most_recent_before(symbol, captured_at),
+            "previous_day": self._nearest_to(symbol, captured_at, timedelta(days=1)),
             "previous_week": self._nearest_to(symbol, captured_at, timedelta(days=7)),
             "previous_month": self._nearest_to(symbol, captured_at, timedelta(days=30)),
         }
-
-    def _most_recent_before(self, symbol: str, captured_at: datetime) -> Snapshot | None:
-        with self._connect() as connection:
-            row = connection.execute(
-                """
-                SELECT * FROM snapshots
-                WHERE symbol = ? AND captured_at < ?
-                ORDER BY captured_at DESC
-                LIMIT 1
-                """,
-                (symbol.upper(), captured_at.isoformat()),
-            ).fetchone()
-        return self._snapshot_from_row(row) if row else None
 
     def _nearest_to(
         self, symbol: str, captured_at: datetime, offset: timedelta

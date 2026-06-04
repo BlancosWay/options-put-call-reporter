@@ -40,7 +40,26 @@ def test_history_store_round_trips_snapshot(tmp_path: Path) -> None:
 
     assert loaded is not None
     assert loaded.symbol == "MSFT"
+    assert loaded.url == current.url
+    assert loaded.captured_at == current.captured_at
+    assert loaded.metrics.latest_earnings == "07/29/26"
+    assert loaded.metrics.implied_volatility == 31.62
+    assert loaded.metrics.historic_volatility == 33.28
+    assert loaded.metrics.iv_rank == 61.17
+    assert loaded.metrics.iv_percentile == 85.0
+    assert loaded.rows[0].expiration_label == "06/18/26 (m)"
+    assert loaded.rows[0].expiration_date == date(2026, 6, 18)
+    assert loaded.rows[0].dte == 16
+    assert loaded.rows[0].put_volume == 26096
+    assert loaded.rows[0].call_volume == 84918
+    assert loaded.rows[0].total_volume == 111014
     assert loaded.rows[0].put_call_volume_ratio == 0.31
+    assert loaded.rows[0].put_open_interest == 244398
+    assert loaded.rows[0].call_open_interest == 454545
+    assert loaded.rows[0].total_open_interest == 698943
+    assert loaded.rows[0].put_call_open_interest_ratio == 0.54
+    assert loaded.rows[0].implied_volatility == 32.94
+    assert loaded.rows[0].is_monthly is True
 
 
 def test_history_store_finds_prior_day_week_month(tmp_path: Path) -> None:
@@ -56,3 +75,32 @@ def test_history_store_finds_prior_day_week_month(tmp_path: Path) -> None:
     assert priors["previous_day"].rows[0].put_call_volume_ratio == 0.40
     assert priors["previous_week"].rows[0].put_call_volume_ratio == 0.50
     assert priors["previous_month"].rows[0].put_call_volume_ratio == 0.60
+
+
+def test_history_store_uses_nearest_prior_trading_snapshots(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    now = datetime(2026, 6, 30, 21, 30)
+    store.save_snapshot(snapshot("MSFT", now - timedelta(hours=1), 0.10))
+    store.save_snapshot(snapshot("MSFT", now - timedelta(days=1, hours=1), 0.40))
+    store.save_snapshot(snapshot("MSFT", now - timedelta(days=6), 0.50))
+    store.save_snapshot(snapshot("MSFT", now - timedelta(days=31), 0.60))
+    store.save_snapshot(snapshot("MSFT", now, 0.31))
+
+    priors = store.prior_snapshots("MSFT", now)
+
+    assert priors["previous_day"].rows[0].put_call_volume_ratio == 0.40
+    assert priors["previous_week"].rows[0].put_call_volume_ratio == 0.50
+    assert priors["previous_month"].rows[0].put_call_volume_ratio == 0.60
+
+
+def test_history_store_prior_snapshots_are_symbol_specific_and_exclude_current(
+    tmp_path: Path,
+) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    now = datetime(2026, 6, 30, 21, 30)
+    store.save_snapshot(snapshot("MSFT", now, 0.31))
+    store.save_snapshot(snapshot("GOOG", now - timedelta(days=1), 0.88))
+
+    priors = store.prior_snapshots("MSFT", now)
+
+    assert priors["previous_day"] is None
