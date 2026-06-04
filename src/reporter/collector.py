@@ -8,7 +8,14 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 from reporter.models import ExpirationRow, Snapshot, SymbolConfig, TopMetrics
-from reporter.parsing import parse_expiration_label, parse_float, parse_int, parse_percent
+from reporter.parsing import ParseError, parse_expiration_label, parse_float, parse_int, parse_percent
+
+
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/137.0.0.0 Safari/537.36"
+)
 
 
 class CollectionError(RuntimeError):
@@ -19,9 +26,15 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
     archive_dir.mkdir(parents=True, exist_ok=True)
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
-        page = await browser.new_page()
+        context = None
+        page = None
         try:
-            await page.goto(symbol_config.url, wait_until="domcontentloaded", timeout=60000)
+            context = await browser.new_context(user_agent=BROWSER_USER_AGENT)
+            page = await context.new_page()
+            response = await page.goto(symbol_config.url, wait_until="domcontentloaded", timeout=60000)
+            status = getattr(response, "status", None)
+            if status is not None and status >= 400:
+                raise CollectionError(f"{symbol_config.symbol} collection returned HTTP {status}")
             await page.locator("table th", has_text="Expiration Date").first.wait_for(timeout=30000)
             html = await page.content()
             snapshot = await _snapshot_from_page(page, symbol_config.symbol, symbol_config.url, captured_at)
@@ -29,7 +42,14 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
             (archive_dir / f"{symbol_config.symbol}-raw.json").write_text(_snapshot_json(snapshot), encoding="utf-8")
             return snapshot
         except Exception as exc:
-            diagnostic_paths, diagnostic_errors = await _capture_failure_diagnostics(page, symbol_config.symbol, archive_dir)
+            if page is None:
+                diagnostic_paths, diagnostic_errors = [], ["page was not created"]
+            else:
+                diagnostic_paths, diagnostic_errors = await _capture_failure_diagnostics(
+                    page,
+                    symbol_config.symbol,
+                    archive_dir,
+                )
             message = f"{symbol_config.symbol} extraction failed: {exc}"
             if diagnostic_paths:
                 message += f"; diagnostics saved to {' and '.join(str(path) for path in diagnostic_paths)}"
@@ -37,6 +57,8 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
                 message += f"; diagnostic capture failed: {'; '.join(diagnostic_errors)}"
             raise CollectionError(message) from exc
         finally:
+            if context is not None:
+                await context.close()
             await browser.close()
 
 
@@ -52,11 +74,12 @@ async def collect_from_html(symbol: str, url: str, html: str, captured_at: datet
 
 
 async def _snapshot_from_page(page, symbol: str, url: str, captured_at: datetime) -> Snapshot:
-    metrics = await _extract_metrics(page)
+    normalized_symbol = symbol.upper()
+    metrics = await _extract_metrics(page, normalized_symbol)
     rows = await _extract_rows(page)
     if not rows:
-        raise CollectionError(f"{symbol} extraction produced zero expiration rows")
-    return Snapshot(symbol=symbol.upper(), url=url, captured_at=captured_at, metrics=metrics, rows=rows)
+        raise CollectionError(f"{normalized_symbol} extraction produced zero expiration rows")
+    return Snapshot(symbol=normalized_symbol, url=url, captured_at=captured_at, metrics=metrics, rows=rows)
 
 
 async def _capture_failure_diagnostics(page, symbol: str, archive_dir: Path) -> tuple[list[Path], list[str]]:
@@ -77,8 +100,8 @@ async def _capture_failure_diagnostics(page, symbol: str, archive_dir: Path) -> 
     return paths, errors
 
 
-async def _extract_metrics(page) -> TopMetrics:
-    text = await page.locator("body").inner_text()
+async def _extract_metrics(page, symbol: str) -> TopMetrics:
+    text = (await page.locator("body").inner_text()).replace("\xa0", " ")
 
     def after(label: str) -> str | None:
         index = text.find(label)
@@ -87,13 +110,39 @@ async def _extract_metrics(page) -> TopMetrics:
         value = text[index + len(label):].strip().splitlines()[0].strip()
         return value.split()[0] if value else None
 
-    return TopMetrics(
+    def required_percent(label: str) -> float | None:
+        raw_value = after(f"{label}:")
+        try:
+            return parse_percent(raw_value)
+        except ParseError as exc:
+            raise CollectionError(f"{symbol} top metric parse failed for {label}: {exc}") from exc
+
+    metrics = TopMetrics(
         latest_earnings=after("Latest Earnings:"),
-        implied_volatility=parse_percent(after("Implied Volatility:")),
-        historic_volatility=parse_percent(after("Historic Volatility:")),
-        iv_rank=parse_percent(after("IV Rank:")),
-        iv_percentile=parse_percent(after("IV Percentile:")),
+        implied_volatility=required_percent("Implied Volatility"),
+        historic_volatility=required_percent("Historic Volatility"),
+        iv_rank=required_percent("IV Rank"),
+        iv_percentile=required_percent("IV Percentile"),
     )
+    missing = _missing_top_metric_labels(metrics)
+    if missing:
+        raise CollectionError(f"{symbol} missing top metrics: {', '.join(missing)}")
+    return metrics
+
+
+def _missing_top_metric_labels(metrics: TopMetrics) -> list[str]:
+    missing: list[str] = []
+    if metrics.latest_earnings is None:
+        missing.append("Latest Earnings")
+    if metrics.implied_volatility is None:
+        missing.append("Implied Volatility")
+    if metrics.historic_volatility is None:
+        missing.append("Historic Volatility")
+    if metrics.iv_rank is None:
+        missing.append("IV Rank")
+    if metrics.iv_percentile is None:
+        missing.append("IV Percentile")
+    return missing
 
 
 async def _extract_rows(page) -> list[ExpirationRow]:

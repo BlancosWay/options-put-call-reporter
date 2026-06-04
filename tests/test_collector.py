@@ -73,10 +73,12 @@ class _FakePage:
         html: str = "",
         *,
         goto_error: Exception | None = None,
+        response_status: int | None = None,
         content_error: Exception | None = None,
     ) -> None:
         self.html = html
         self.goto_error = goto_error
+        self.response_status = response_status
         self.content_error = content_error
         self.goto_calls: list[dict[str, object]] = []
         self.waited_for_texts: list[tuple[str, int]] = []
@@ -87,6 +89,9 @@ class _FakePage:
         self.goto_calls.append({"url": url, "wait_until": wait_until, "timeout": timeout})
         if self.goto_error is not None:
             raise self.goto_error
+        if self.response_status is not None:
+            return _FakeResponse(self.response_status)
+        return None
 
     def get_by_text(self, text: str) -> _FakeWaitHandle:
         return _FakeWaitHandle(self, text)
@@ -113,6 +118,12 @@ class _FakeBrowser:
         self._playwright = playwright
         self.closed = False
 
+    async def new_context(self, *, user_agent: str) -> "_FakeContext":
+        self._playwright.context_user_agents.append(user_agent)
+        context = _FakeContext(self._playwright)
+        self._playwright.contexts.append(context)
+        return context
+
     async def new_page(self) -> _FakePage:
         page = self._playwright.new_page()
         self._playwright.pages.append(page)
@@ -120,6 +131,25 @@ class _FakeBrowser:
 
     async def close(self) -> None:
         self.closed = True
+
+
+class _FakeContext:
+    def __init__(self, playwright: "_FakePlaywright") -> None:
+        self._playwright = playwright
+        self.closed = False
+
+    async def new_page(self) -> _FakePage:
+        page = self._playwright.new_page()
+        self._playwright.pages.append(page)
+        return page
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class _FakeResponse:
+    def __init__(self, status: int) -> None:
+        self.status = status
 
 
 class _FakeChromium:
@@ -141,6 +171,8 @@ class _FakePlaywright:
         self.launch_count = 0
         self.pages: list[_FakePage] = []
         self.browsers: list[_FakeBrowser] = []
+        self.contexts: list[_FakeContext] = []
+        self.context_user_agents: list[str] = []
 
     def new_page(self) -> _FakePage:
         return self._page_factory()
@@ -194,6 +226,66 @@ async def test_collect_from_html_extracts_metrics_and_rows(tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
+async def test_collect_from_html_extracts_metrics_with_nonbreaking_space_labels(tmp_path: Path) -> None:
+    html = (
+        FIXTURE_HTML.read_text(encoding="utf-8")
+        .replace("Latest Earnings:", "Latest&nbsp;Earnings:")
+        .replace("Implied Volatility:", "Implied&nbsp;Volatility:")
+        .replace("Historic Volatility:", "Historic&nbsp;Volatility:")
+        .replace("IV Rank:", "IV&nbsp;Rank:")
+        .replace("IV Percentile:", "IV&nbsp;Percentile:")
+    )
+
+    snapshot = await collect_from_html(
+        symbol="MSFT",
+        url="https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+        html=html,
+        captured_at=datetime(2026, 6, 2, 21, 30),
+    )
+
+    assert snapshot.metrics.latest_earnings == "07/29/26"
+    assert snapshot.metrics.implied_volatility == 31.62
+    assert snapshot.metrics.historic_volatility == 33.28
+    assert snapshot.metrics.iv_rank == 61.17
+    assert snapshot.metrics.iv_percentile == 85.0
+
+
+@pytest.mark.asyncio
+async def test_collect_from_html_rejects_snapshots_missing_required_top_metrics(tmp_path: Path) -> None:
+    html = FIXTURE_HTML.read_text(encoding="utf-8").replace(
+        "      <span>IV Rank:</span><strong>61.17%</strong>\n",
+        "",
+    )
+
+    with pytest.raises(CollectionError) as exc_info:
+        await collect_from_html(
+            symbol="MSFT",
+            url="https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+            html=html,
+            captured_at=datetime(2026, 6, 2, 21, 30),
+        )
+
+    assert "MSFT missing top metrics: IV Rank" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_collect_from_html_rejects_unparsable_required_top_metric(tmp_path: Path) -> None:
+    html = FIXTURE_HTML.read_text(encoding="utf-8").replace("61.17%", "not-a-percent")
+
+    with pytest.raises(CollectionError) as exc_info:
+        await collect_from_html(
+            symbol="MSFT",
+            url="https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+            html=html,
+            captured_at=datetime(2026, 6, 2, 21, 30),
+        )
+
+    message = str(exc_info.value)
+    assert "MSFT top metric parse failed" in message
+    assert "IV Rank" in message
+
+
+@pytest.mark.asyncio
 async def test_collect_symbol_writes_raw_artifacts_without_second_browser_launch(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -215,6 +307,48 @@ async def test_collect_symbol_writes_raw_artifacts_without_second_browser_launch
     assert raw_json["symbol"] == "MSFT"
     assert raw_json["rows"][1]["expiration_label"] == "06/26/26 (w)"
     assert fake_playwright.launch_count == 1
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_uses_realistic_browser_user_agent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    html = FIXTURE_HTML.read_text(encoding="utf-8")
+    fake_playwright = _FakePlaywright(lambda: _FakePage(html))
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    await collect_symbol(
+        SymbolConfig("msft", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert len(fake_playwright.context_user_agents) == 1
+    user_agent = fake_playwright.context_user_agents[0]
+    assert "Mozilla/5.0" in user_agent
+    assert "Chrome/" in user_agent
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_fails_fast_on_blocked_http_status(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    html = FIXTURE_HTML.read_text(encoding="utf-8")
+    page = _FakePage(html, response_status=403)
+    fake_playwright = _FakePlaywright(lambda: page)
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    with pytest.raises(CollectionError) as exc_info:
+        await collect_symbol(
+            SymbolConfig("MSFT", "https://example.test/msft"),
+            captured_at=datetime(2026, 6, 2, 21, 30),
+            archive_dir=tmp_path,
+        )
+
+    assert "HTTP 403" in str(exc_info.value)
+    assert page.waited_for_locators == []
 
 
 @pytest.mark.asyncio
