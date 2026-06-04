@@ -36,6 +36,7 @@ def test_build_drift_reports_signal_flip_and_ratio_changes() -> None:
     drift = build_drift(current, {"previous_day": previous}, thresholds())
 
     assert len(drift) == 1
+    assert "bullish decreased" in drift[0].summary
     assert "bearish increased" in drift[0].summary
     assert "average put/call volume ratio increased" in drift[0].summary
     assert "average put/call open-interest ratio increased" in drift[0].summary
