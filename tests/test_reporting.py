@@ -1,3 +1,4 @@
+import csv
 from datetime import date, datetime
 from pathlib import Path
 
@@ -60,9 +61,24 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
     assert "# Daily Options Put/Call Report - 2026-06-02" in markdown
     assert "NOW: mixed overall." in markdown
-    csv_text = csv_path.read_text(encoding="utf-8")
-    assert csv_text.startswith("expiration_label,")
-    assert "06/18/26 (m)" in csv_text
+    assert "07/22/26" in markdown
+    assert "30.86" in markdown
+    assert "06/18/26 (m)" in markdown
+    assert "Mixed" in markdown
+    assert "No previous_day snapshot is available yet." in markdown
+    assert str(tmp_path) in markdown
+
+    with csv_path.open(encoding="utf-8", newline="") as file:
+        csv_rows = list(csv.reader(file))
+    assert len(csv_rows) == 2
+    header = csv_rows[0]
+    values = csv_rows[1]
+    assert len(header) == len(values)
+    csv_values = dict(zip(header, values))
+    assert csv_values["expiration_label"] == "06/18/26 (m)"
+    assert csv_values["put_call_volume_ratio"] == "0.44"
+    assert csv_values["put_call_open_interest_ratio"] == "0.9"
+    assert csv_values["is_monthly"] == "True"
 
 
 def test_render_reports_uses_dash_for_missing_metrics(tmp_path: Path) -> None:
@@ -104,5 +120,27 @@ def test_render_reports_records_failures_without_csv(tmp_path: Path) -> None:
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
     assert "Failures" in html
     assert "ERR: fetch timed out" in html
+    assert "## Failures" in markdown
+    assert "ERR: fetch timed out" in markdown
     assert "Failed: fetch timed out" in markdown
     assert not (tmp_path / "ERR-expirations.csv").exists()
+
+
+def test_render_reports_escapes_dynamic_html_content(tmp_path: Path) -> None:
+    bundle = render_reports(
+        generated_at=datetime(2026, 6, 2, 21, 35),
+        symbol_reports=[
+            SymbolReport(
+                symbol="XSS",
+                snapshot=None,
+                analysis=None,
+                drift=[],
+                error='fetch failed <script>alert("x")</script>',
+            )
+        ],
+        archive_dir=tmp_path,
+    )
+
+    html = bundle.html_path.read_text(encoding="utf-8")
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html

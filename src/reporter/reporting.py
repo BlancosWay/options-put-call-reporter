@@ -56,9 +56,59 @@ def _drift_html(report: SymbolReport) -> str:
     return "\n".join(parts)
 
 
-def _raw_csv(report: SymbolReport, archive_dir: Path) -> None:
+def _metric_text(value: object | None) -> str:
+    if value is None:
+        return "—"
+    return str(value)
+
+
+def _metrics_markdown(report: SymbolReport) -> list[str]:
     if report.snapshot is None:
-        return
+        return ["No metrics available."]
+    metrics = report.snapshot.metrics
+    return [
+        "| Latest Earnings | IV | Historic Vol | IV Rank | IV Percentile |",
+        "| --- | ---: | ---: | ---: | ---: |",
+        "| "
+        f"{_metric_text(metrics.latest_earnings)} | "
+        f"{_metric_text(metrics.implied_volatility)} | "
+        f"{_metric_text(metrics.historic_volatility)} | "
+        f"{_metric_text(metrics.iv_rank)} | "
+        f"{_metric_text(metrics.iv_percentile)} |",
+    ]
+
+
+def _monthly_markdown(report: SymbolReport) -> list[str]:
+    if report.analysis is None or not report.analysis.monthly_signals:
+        return ["No monthly signals available."]
+    rows = [
+        "| Month | Expiration | Put/Call Vol | Put/Call OI | Total Vol | Total OI | Signal |",
+        "| --- | --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for item in report.analysis.monthly_signals:
+        rows.append(
+            "| "
+            f"{item.month} | {item.expiration_label} | "
+            f"{item.put_call_volume_ratio:.2f} | {item.put_call_open_interest_ratio:.2f} | "
+            f"{item.total_volume} | {item.total_open_interest} | {item.signal.value} |"
+        )
+    return rows
+
+
+def _drift_markdown(report: SymbolReport) -> list[str]:
+    if not report.drift:
+        return ["No drift comparisons available."]
+    rows = []
+    for item in report.drift:
+        flips = "; ".join(item.signal_flips)
+        suffix = f" Signal flips: {flips}" if flips else ""
+        rows.append(f"- **{item.period}**: {item.summary}{suffix}")
+    return rows
+
+
+def _raw_csv(report: SymbolReport, archive_dir: Path) -> Path | None:
+    if report.snapshot is None:
+        return None
     path = archive_dir / f"{report.symbol}-expirations.csv"
     with path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.writer(file)
@@ -93,6 +143,7 @@ def _raw_csv(report: SymbolReport, archive_dir: Path) -> None:
                 row.implied_volatility,
                 row.is_monthly,
             ])
+    return path
 
 
 def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], archive_dir: Path) -> ReportBundle:
@@ -107,9 +158,12 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
     failures = [report for report in symbol_reports if report.error]
     if failures:
         html_sections.append("<h2>Failures</h2><ul>")
+        markdown_sections.extend(["## Failures", ""])
         for failure in failures:
             html_sections.append(f"<li>{escape(failure.symbol)}: {escape(failure.error or '')}</li>")
+            markdown_sections.append(f"- {failure.symbol}: {failure.error or ''}")
         html_sections.append("</ul>")
+        markdown_sections.append("")
 
     for report in symbol_reports:
         html_sections.append(f"<h2>{escape(report.symbol)}</h2>")
@@ -123,11 +177,21 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
         html_sections.append(_monthly_html(report))
         html_sections.append("<h3>Drift</h3>")
         html_sections.append(_drift_html(report))
-        markdown_sections.extend([f"## {report.symbol}", report.analysis.commentary if report.analysis else "", ""])
-        _raw_csv(report, archive_dir)
+        csv_path = _raw_csv(report, archive_dir)
+        markdown_sections.extend([f"## {report.symbol}", "", "### Metrics"])
+        markdown_sections.extend(_metrics_markdown(report))
+        markdown_sections.extend(["", "### Commentary", report.analysis.commentary if report.analysis else ""])
+        markdown_sections.extend(["", "### Monthly Signals"])
+        markdown_sections.extend(_monthly_markdown(report))
+        markdown_sections.extend(["", "### Drift"])
+        markdown_sections.extend(_drift_markdown(report))
+        if csv_path is not None:
+            markdown_sections.extend(["", f"Raw CSV: {csv_path}"])
+        markdown_sections.append("")
 
     html_sections.append(f"<p>Archive: {escape(str(archive_dir))}</p>")
     html_sections.append("</body></html>")
+    markdown_sections.extend(["## Archive", "", f"Archive: {archive_dir}", ""])
 
     markdown_path = archive_dir / "report.md"
     html_path = archive_dir / "report.html"
