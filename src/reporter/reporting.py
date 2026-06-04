@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import csv
+from datetime import datetime
+from html import escape
+from pathlib import Path
+
+from reporter.models import ReportBundle, SymbolReport
+
+
+def _metric_cell(value: object | None) -> str:
+    if value is None:
+        return "—"
+    return escape(str(value))
+
+
+def _metrics_html(report: SymbolReport) -> str:
+    if report.snapshot is None:
+        return "<p>No metrics available.</p>"
+    metrics = report.snapshot.metrics
+    return (
+        "<table><tr><th>Latest Earnings</th><th>IV</th><th>Historic Vol</th><th>IV Rank</th><th>IV Percentile</th></tr>"
+        f"<tr><td>{_metric_cell(metrics.latest_earnings)}</td>"
+        f"<td>{_metric_cell(metrics.implied_volatility)}</td><td>{_metric_cell(metrics.historic_volatility)}</td>"
+        f"<td>{_metric_cell(metrics.iv_rank)}</td><td>{_metric_cell(metrics.iv_percentile)}</td></tr></table>"
+    )
+
+
+def _monthly_html(report: SymbolReport) -> str:
+    if report.analysis is None:
+        return "<p>No monthly signals available.</p>"
+    rows = [
+        "<table><tr><th>Month</th><th>Expiration</th><th>Put/Call Vol</th><th>Put/Call OI</th><th>Total Vol</th><th>Total OI</th><th>Signal</th></tr>"
+    ]
+    for item in report.analysis.monthly_signals:
+        rows.append(
+            "<tr>"
+            f"<td>{escape(item.month)}</td><td>{escape(item.expiration_label)}</td>"
+            f"<td>{item.put_call_volume_ratio:.2f}</td><td>{item.put_call_open_interest_ratio:.2f}</td>"
+            f"<td>{item.total_volume}</td><td>{item.total_open_interest}</td><td>{escape(item.signal.value)}</td>"
+            "</tr>"
+        )
+    rows.append("</table>")
+    return "\n".join(rows)
+
+
+def _drift_html(report: SymbolReport) -> str:
+    if not report.drift:
+        return "<p>No drift comparisons available.</p>"
+    parts = ["<ul>"]
+    for item in report.drift:
+        flips = "; ".join(item.signal_flips)
+        suffix = f" Signal flips: {escape(flips)}" if flips else ""
+        parts.append(f"<li><strong>{escape(item.period)}</strong>: {escape(item.summary)}{suffix}</li>")
+    parts.append("</ul>")
+    return "\n".join(parts)
+
+
+def _raw_csv(report: SymbolReport, archive_dir: Path) -> None:
+    if report.snapshot is None:
+        return
+    path = archive_dir / f"{report.symbol}-expirations.csv"
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            "expiration_label",
+            "expiration_date",
+            "dte",
+            "put_volume",
+            "call_volume",
+            "total_volume",
+            "put_call_volume_ratio",
+            "put_open_interest",
+            "call_open_interest",
+            "total_open_interest",
+            "put_call_open_interest_ratio",
+            "implied_volatility",
+            "is_monthly",
+        ])
+        for row in report.snapshot.rows:
+            writer.writerow([
+                row.expiration_label,
+                row.expiration_date.isoformat(),
+                row.dte,
+                row.put_volume,
+                row.call_volume,
+                row.total_volume,
+                row.put_call_volume_ratio,
+                row.put_open_interest,
+                row.call_open_interest,
+                row.total_open_interest,
+                row.put_call_open_interest_ratio,
+                row.implied_volatility,
+                row.is_monthly,
+            ])
+
+
+def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], archive_dir: Path) -> ReportBundle:
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    title = f"Daily Options Put/Call Report - {generated_at:%Y-%m-%d}"
+    html_sections = [
+        "<!DOCTYPE html>",
+        f'<html lang="en"><head><meta charset="utf-8"><title>{title}</title></head><body>',
+        f"<h1>{title}</h1>",
+    ]
+    markdown_sections = [f"# {title}", ""]
+    failures = [report for report in symbol_reports if report.error]
+    if failures:
+        html_sections.append("<h2>Failures</h2><ul>")
+        for failure in failures:
+            html_sections.append(f"<li>{escape(failure.symbol)}: {escape(failure.error or '')}</li>")
+        html_sections.append("</ul>")
+
+    for report in symbol_reports:
+        html_sections.append(f"<h2>{escape(report.symbol)}</h2>")
+        if report.error:
+            html_sections.append(f"<p><strong>Failed:</strong> {escape(report.error)}</p>")
+            markdown_sections.extend([f"## {report.symbol}", f"Failed: {report.error}", ""])
+            continue
+        html_sections.append(_metrics_html(report))
+        html_sections.append(f"<p>{escape(report.analysis.commentary if report.analysis else '')}</p>")
+        html_sections.append("<h3>Monthly Signals</h3>")
+        html_sections.append(_monthly_html(report))
+        html_sections.append("<h3>Drift</h3>")
+        html_sections.append(_drift_html(report))
+        markdown_sections.extend([f"## {report.symbol}", report.analysis.commentary if report.analysis else "", ""])
+        _raw_csv(report, archive_dir)
+
+    html_sections.append(f"<p>Archive: {escape(str(archive_dir))}</p>")
+    html_sections.append("</body></html>")
+
+    markdown_path = archive_dir / "report.md"
+    html_path = archive_dir / "report.html"
+    markdown_path.write_text("\n".join(markdown_sections), encoding="utf-8")
+    html_path.write_text("\n".join(html_sections), encoding="utf-8")
+    return ReportBundle(
+        generated_at=generated_at,
+        symbol_reports=symbol_reports,
+        archive_dir=archive_dir,
+        markdown_path=markdown_path,
+        html_path=html_path,
+    )
