@@ -26,6 +26,7 @@ def get_password(service: str, account: str) -> str:
 def set_password(service: str, account: str, password: str) -> None:
     if not password:
         raise KeychainError("Cannot store an empty Gmail App Password in Keychain")
+    failed = False
     try:
         subprocess.run(
             ["security", "add-generic-password", "-a", account, "-s", service, "-w", password, "-U"],
@@ -33,5 +34,7 @@ def set_password(service: str, account: str, password: str) -> None:
             capture_output=True,
             text=True,
         )
-    except Exception as exc:
-        raise KeychainError(f"Unable to store Gmail App Password in Keychain for account '{account}'") from exc
+    except Exception:
+        failed = True
+    if failed:
+        raise KeychainError(f"Unable to store Gmail App Password in Keychain for account '{account}'") from None

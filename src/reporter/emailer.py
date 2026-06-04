@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import smtplib
+import ssl
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -29,7 +30,8 @@ def send_email_report(
 
     try:
         with smtplib.SMTP(smtp_host, smtp_port) as smtp:
-            smtp.starttls()
+            context = ssl.create_default_context()
+            smtp.starttls(context=context)
             smtp.login(email_config.from_email, app_password)
             smtp.send_message(message)
     except Exception as exc:
