@@ -178,6 +178,9 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
         html_sections.append("<h3>Drift</h3>")
         html_sections.append(_drift_html(report))
         csv_path = _raw_csv(report, archive_dir)
+        if csv_path is not None:
+            csv_ref = escape(csv_path.name)
+            html_sections.append(f'<p>Raw CSV: <a href="{csv_ref}">{csv_ref}</a></p>')
         markdown_sections.extend([f"## {report.symbol}", "", "### Metrics"])
         markdown_sections.extend(_metrics_markdown(report))
         markdown_sections.extend(["", "### Commentary", report.analysis.commentary if report.analysis else ""])

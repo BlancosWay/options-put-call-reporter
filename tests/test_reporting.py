@@ -58,6 +58,7 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
     assert "NOW" in html
     assert "06/18/26 (m)" in html
     assert "Mixed" in html
+    assert "NOW-expirations.csv" in html
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
     assert "# Daily Options Put/Call Report - 2026-06-02" in markdown
     assert "NOW: mixed overall." in markdown
