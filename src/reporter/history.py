@@ -53,7 +53,7 @@ class HistoryStore:
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
-                    snapshot.symbol,
+                    snapshot.symbol.upper(),
                     snapshot.url,
                     snapshot.captured_at.isoformat(),
                     metrics_json,
@@ -89,11 +89,19 @@ class HistoryStore:
             row = connection.execute(
                 """
                 SELECT * FROM snapshots
-                WHERE symbol = ? AND captured_at < ?
-                ORDER BY ABS(julianday(captured_at) - julianday(?)) ASC
+                WHERE symbol = ?
+                  AND captured_at < ?
+                  AND substr(captured_at, 1, 10) < substr(?, 1, 10)
+                ORDER BY ABS(julianday(captured_at) - julianday(?)) ASC,
+                         captured_at DESC
                 LIMIT 1
                 """,
-                (symbol.upper(), captured_at.isoformat(), target.isoformat()),
+                (
+                    symbol.upper(),
+                    captured_at.isoformat(),
+                    captured_at.isoformat(),
+                    target.isoformat(),
+                ),
             ).fetchone()
         return self._snapshot_from_row(row) if row else None
 

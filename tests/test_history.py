@@ -104,3 +104,39 @@ def test_history_store_prior_snapshots_are_symbol_specific_and_exclude_current(
     priors = store.prior_snapshots("MSFT", now)
 
     assert priors["previous_day"] is None
+
+
+def test_history_store_prior_snapshots_ignore_same_day_reruns(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    now = datetime(2026, 6, 30, 21, 30)
+    store.save_snapshot(snapshot("MSFT", now - timedelta(hours=1), 0.10))
+
+    priors = store.prior_snapshots("MSFT", now)
+
+    assert priors["previous_day"] is None
+    assert priors["previous_week"] is None
+    assert priors["previous_month"] is None
+
+
+def test_history_store_normalizes_saved_symbol(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    current = snapshot("msft", datetime(2026, 6, 2, 21, 30), 0.31)
+
+    store.save_snapshot(current)
+    loaded = store.latest_snapshot("MSFT")
+
+    assert loaded is not None
+    assert loaded.symbol == "MSFT"
+
+
+def test_history_store_nearest_lookup_breaks_ties_with_newer_snapshot(
+    tmp_path: Path,
+) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    now = datetime(2026, 6, 30, 21, 30)
+    store.save_snapshot(snapshot("MSFT", now - timedelta(days=8), 0.80))
+    store.save_snapshot(snapshot("MSFT", now - timedelta(days=6), 0.60))
+
+    priors = store.prior_snapshots("MSFT", now)
+
+    assert priors["previous_week"].rows[0].put_call_volume_ratio == 0.60
