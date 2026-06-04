@@ -21,19 +21,21 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
         browser = await playwright.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            await page.goto(symbol_config.url, wait_until="networkidle", timeout=60000)
-            await page.get_by_text("Expiration Date").first.wait_for(timeout=30000)
+            await page.goto(symbol_config.url, wait_until="domcontentloaded", timeout=60000)
+            await page.locator("table th", has_text="Expiration Date").first.wait_for(timeout=30000)
             html = await page.content()
-            snapshot = await collect_from_html(symbol_config.symbol, symbol_config.url, html, captured_at)
+            snapshot = await _snapshot_from_page(page, symbol_config.symbol, symbol_config.url, captured_at)
             (archive_dir / f"{symbol_config.symbol}-raw.html").write_text(html, encoding="utf-8")
             (archive_dir / f"{symbol_config.symbol}-raw.json").write_text(_snapshot_json(snapshot), encoding="utf-8")
             return snapshot
         except Exception as exc:
-            html_path = archive_dir / f"{symbol_config.symbol}-failure.html"
-            png_path = archive_dir / f"{symbol_config.symbol}-failure.png"
-            html_path.write_text(await page.content(), encoding="utf-8")
-            await page.screenshot(path=png_path, full_page=True)
-            raise CollectionError(f"{symbol_config.symbol} extraction failed; diagnostics saved to {html_path} and {png_path}") from exc
+            diagnostic_paths, diagnostic_errors = await _capture_failure_diagnostics(page, symbol_config.symbol, archive_dir)
+            message = f"{symbol_config.symbol} extraction failed: {exc}"
+            if diagnostic_paths:
+                message += f"; diagnostics saved to {' and '.join(str(path) for path in diagnostic_paths)}"
+            if diagnostic_errors:
+                message += f"; diagnostic capture failed: {'; '.join(diagnostic_errors)}"
+            raise CollectionError(message) from exc
         finally:
             await browser.close()
 
@@ -44,13 +46,35 @@ async def collect_from_html(symbol: str, url: str, html: str, captured_at: datet
         page = await browser.new_page()
         try:
             await page.set_content(html)
-            metrics = await _extract_metrics(page)
-            rows = await _extract_rows(page)
-            if not rows:
-                raise CollectionError(f"{symbol} extraction produced zero expiration rows")
-            return Snapshot(symbol=symbol.upper(), url=url, captured_at=captured_at, metrics=metrics, rows=rows)
+            return await _snapshot_from_page(page, symbol, url, captured_at)
         finally:
             await browser.close()
+
+
+async def _snapshot_from_page(page, symbol: str, url: str, captured_at: datetime) -> Snapshot:
+    metrics = await _extract_metrics(page)
+    rows = await _extract_rows(page)
+    if not rows:
+        raise CollectionError(f"{symbol} extraction produced zero expiration rows")
+    return Snapshot(symbol=symbol.upper(), url=url, captured_at=captured_at, metrics=metrics, rows=rows)
+
+
+async def _capture_failure_diagnostics(page, symbol: str, archive_dir: Path) -> tuple[list[Path], list[str]]:
+    paths: list[Path] = []
+    errors: list[str] = []
+    html_path = archive_dir / f"{symbol}-failure.html"
+    png_path = archive_dir / f"{symbol}-failure.png"
+    try:
+        html_path.write_text(await page.content(), encoding="utf-8")
+        paths.append(html_path)
+    except Exception as exc:
+        errors.append(f"HTML: {exc}")
+    try:
+        await page.screenshot(path=png_path, full_page=True)
+        paths.append(png_path)
+    except Exception as exc:
+        errors.append(f"PNG: {exc}")
+    return paths, errors
 
 
 async def _extract_metrics(page) -> TopMetrics:
