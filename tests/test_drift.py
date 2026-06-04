@@ -37,6 +37,8 @@ def test_build_drift_reports_signal_flip_and_ratio_changes() -> None:
 
     assert len(drift) == 1
     assert "bearish increased" in drift[0].summary
+    assert "average put/call volume ratio increased" in drift[0].summary
+    assert "average put/call open-interest ratio increased" in drift[0].summary
     assert "2026-06: Bullish -> Bearish / hedging-heavy" in drift[0].signal_flips
 
 
