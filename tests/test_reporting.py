@@ -67,6 +67,7 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
     assert "06/18/26 (m)" in markdown
     assert "Mixed" in markdown
     assert "No previous_day snapshot is available yet." in markdown
+    assert f"Raw CSV: {csv_path}" in markdown
     assert str(tmp_path) in markdown
 
     with csv_path.open(encoding="utf-8", newline="") as file:
