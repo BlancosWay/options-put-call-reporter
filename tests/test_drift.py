@@ -38,3 +38,39 @@ def test_build_drift_reports_signal_flip_and_ratio_changes() -> None:
     assert len(drift) == 1
     assert "bearish increased" in drift[0].summary
     assert "2026-06: Bullish -> Bearish / hedging-heavy" in drift[0].signal_flips
+
+
+def test_build_drift_reports_no_current_monthly_signals() -> None:
+    current = SymbolAnalysis(
+        symbol="MSFT",
+        captured_at=datetime(2026, 6, 30, 21, 30),
+        metrics=TopMetrics("07/29/26", 31.0, 33.0, 60.0, 80.0),
+        monthly_signals=[],
+        commentary="summary",
+    )
+    previous = analysis("MSFT", Signal.BULLISH, 0.50, 0.80)
+
+    drift = build_drift(current, {"previous_day": previous}, thresholds())
+
+    assert len(drift) == 1
+    assert drift[0].period == "previous_day"
+    assert "No current monthly signals" in drift[0].summary
+    assert drift[0].signal_flips == []
+
+
+def test_build_drift_reports_no_prior_monthly_signals() -> None:
+    current = analysis("MSFT", Signal.BULLISH, 0.50, 0.80)
+    previous = SymbolAnalysis(
+        symbol="MSFT",
+        captured_at=datetime(2026, 6, 30, 21, 30),
+        metrics=TopMetrics("07/29/26", 31.0, 33.0, 60.0, 80.0),
+        monthly_signals=[],
+        commentary="summary",
+    )
+
+    drift = build_drift(current, {"previous_day": previous}, thresholds())
+
+    assert len(drift) == 1
+    assert drift[0].period == "previous_day"
+    assert "No prior monthly signals" in drift[0].summary
+    assert drift[0].signal_flips == []

@@ -42,6 +42,23 @@ def build_drift(
             items.append(DriftItem(period=period, summary=f"No {period} snapshot is available yet."))
             continue
 
+        if not current.monthly_signals:
+            items.append(
+                DriftItem(
+                    period=period,
+                    summary=f"No current monthly signals are available for {period} comparison.",
+                )
+            )
+            continue
+        if not prior.monthly_signals:
+            items.append(
+                DriftItem(
+                    period=period,
+                    summary=f"No prior monthly signals are available for {period} comparison.",
+                )
+            )
+            continue
+
         current_by_month = _index(current.monthly_signals)
         prior_by_month = _index(prior.monthly_signals)
         flips: list[str] = []
