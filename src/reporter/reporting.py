@@ -156,6 +156,11 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
     ]
     markdown_sections = [f"# {title}", ""]
     failures = [report for report in symbol_reports if report.error]
+    successes = [report for report in symbol_reports if not report.error]
+    if symbol_reports and not successes:
+        all_failed_message = "No usable symbol data was collected for this run. All configured symbols failed."
+        html_sections.append(f"<p><strong>{all_failed_message}</strong></p>")
+        markdown_sections.extend([f"**{all_failed_message}**", ""])
     if failures:
         html_sections.append("<h2>Failures</h2><ul>")
         markdown_sections.extend(["## Failures", ""])

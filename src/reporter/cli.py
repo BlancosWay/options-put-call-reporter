@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import getpass
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -67,22 +68,27 @@ async def _run_async(args: argparse.Namespace) -> int:
     bundle = render_reports(captured_at, symbol_reports, run_archive)
     failures = [report for report in symbol_reports if report.error]
     successes = [report for report in symbol_reports if not report.error]
+    exit_code = 1 if not successes else 0
 
     if args.send_email:
-        email_config = _load_email_config(args.email_config)
-        app_password = get_password(config.keychain_service, email_config.from_email)
-        subject_status = "FAILED" if not successes else "Partial" if failures else "Complete"
-        send_email_report(
-            email_config=email_config,
-            smtp_host=config.gmail_smtp_host,
-            smtp_port=config.gmail_smtp_port,
-            app_password=app_password,
-            subject=f"{subject_status} Options Put/Call Report - {captured_at:%Y-%m-%d}",
-            html_path=bundle.html_path,
-        )
+        try:
+            email_config = _load_email_config(args.email_config)
+            app_password = get_password(config.keychain_service, email_config.from_email)
+            subject_status = "FAILED" if not successes else "Partial" if failures else "Complete"
+            send_email_report(
+                email_config=email_config,
+                smtp_host=config.gmail_smtp_host,
+                smtp_port=config.gmail_smtp_port,
+                app_password=app_password,
+                subject=f"{subject_status} Options Put/Call Report - {captured_at:%Y-%m-%d}",
+                html_path=bundle.html_path,
+            )
+        except Exception as exc:
+            print(f"Email was not sent: {exc}. Report remains at {bundle.html_path}", file=sys.stderr)
+            exit_code = 1
 
     print(f"Report written to {bundle.html_path}")
-    return 1 if not successes else 0
+    return exit_code
 
 
 def _setup_email(args: argparse.Namespace) -> int:

@@ -118,8 +118,10 @@ def test_run_returns_nonzero_when_all_symbols_fail(monkeypatch, tmp_path: Path) 
 
     exit_code = main(["run", "--config", str(config_path), "--no-email", "--run-date", "2026-06-02T21:30:00"])
 
+    report_html = (tmp_path / "archive" / "2026-06-02" / "report.html").read_text(encoding="utf-8")
     assert exit_code == 1
     assert (tmp_path / "archive" / "2026-06-02" / "report.html").exists()
+    assert "No usable symbol data was collected for this run. All configured symbols failed." in report_html
 
 
 def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: Path) -> None:
@@ -160,6 +162,87 @@ def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: P
     assert sent["smtp_port"] == 587
     assert sent["subject"] == "Complete Options Put/Call Report - 2026-06-02"
     assert Path(sent["html_path"]).name == "report.html"
+
+
+def test_run_send_email_failure_prints_clear_error_and_keeps_report(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "symbols.json"
+    email_config_path = tmp_path / "email.local.json"
+    _config(config_path)
+    email_config_path.write_text(
+        json.dumps({"from_email": "sender@gmail.com", "to_email": "recipient@gmail.com"}),
+        encoding="utf-8",
+    )
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+    monkeypatch.setattr("reporter.cli.get_password", lambda service, account: "app-password")
+    monkeypatch.setattr(
+        "reporter.cli.send_email_report",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("SMTP unavailable")),
+    )
+
+    exit_code = main([
+        "run",
+        "--config",
+        str(config_path),
+        "--email-config",
+        str(email_config_path),
+        "--send-email",
+        "--run-date",
+        "2026-06-02T21:30:00",
+    ])
+
+    assert exit_code == 1
+    report_path = tmp_path / "archive" / "2026-06-02" / "report.html"
+    assert report_path.exists()
+    captured = capsys.readouterr()
+    assert "Email was not sent: SMTP unavailable" in captured.err
+    assert str(report_path) in captured.err
+    assert "Report written to" in captured.out
+
+
+def test_run_send_email_missing_keychain_prints_clear_error_and_keeps_report(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "symbols.json"
+    email_config_path = tmp_path / "email.local.json"
+    _config(config_path)
+    email_config_path.write_text(
+        json.dumps({"from_email": "sender@gmail.com", "to_email": "recipient@gmail.com"}),
+        encoding="utf-8",
+    )
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+    monkeypatch.setattr("reporter.cli.get_password", lambda service, account: (_ for _ in ()).throw(RuntimeError("missing keychain secret")))
+
+    exit_code = main([
+        "run",
+        "--config",
+        str(config_path),
+        "--email-config",
+        str(email_config_path),
+        "--send-email",
+        "--run-date",
+        "2026-06-02T21:30:00",
+    ])
+
+    assert exit_code == 1
+    report_path = tmp_path / "archive" / "2026-06-02" / "report.html"
+    assert report_path.exists()
+    captured = capsys.readouterr()
+    assert "Email was not sent: missing keychain secret" in captured.err
+    assert str(report_path) in captured.err
 
 
 def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_path: Path) -> None:
