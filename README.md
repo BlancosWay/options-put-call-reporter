@@ -39,6 +39,13 @@ options-put-call-report run --send-email
 
 ## Scheduler
 
+Before installing the scheduler, confirm that a manual email run succeeds:
+
+```bash
+source .venv/bin/activate
+options-put-call-report run --send-email
+```
+
 Install the launchd job:
 
 ```bash
@@ -46,3 +53,15 @@ Install the launchd job:
 ```
 
 The scheduled job runs at 2:30 PM Pacific Time, which corresponds to 5:30 PM Eastern Time.
+
+Check scheduler status:
+
+```bash
+launchctl list | grep com.sri.options-put-call-reporter
+```
+
+Logs are written to:
+
+- `archive/runner.log`
+- `archive/launchd.out.log`
+- `archive/launchd.err.log`
