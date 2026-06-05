@@ -79,12 +79,14 @@ class _FakePage:
         goto_error: Exception | None = None,
         response_status: int | None = None,
         expiration_response_data: dict[str, Any] | None = None,
+        expiration_response_text: str | None = None,
         content_error: Exception | None = None,
     ) -> None:
         self.html = html
         self.goto_error = goto_error
         self.response_status = response_status
         self.expiration_response_data = expiration_response_data
+        self.expiration_response_text = expiration_response_text
         self.content_error = content_error
         self.goto_calls: list[dict[str, object]] = []
         self.waited_for_texts: list[tuple[str, int]] = []
@@ -100,7 +102,7 @@ class _FakePage:
             raise self.goto_error
         if self.response_status is not None:
             return _FakeResponse(self.response_status)
-        response = _FakeResponse(200, self.expiration_response_data)
+        response = _FakeResponse(200, self.expiration_response_data, self.expiration_response_text)
         for handler in list(self.response_handlers):
             handler(response)
         return None
@@ -175,13 +177,17 @@ class _FakeContext:
 
 
 class _FakeResponse:
-    def __init__(self, status: int, data: dict[str, Any] | None = None) -> None:
+    def __init__(self, status: int, data: dict[str, Any] | None = None, text: str | None = None) -> None:
         self.status = status
         self.url = "https://www.barchart.com/proxies/core-api/v1/options-expirations/get"
         self._data = data if data is not None else _options_expirations_response()
+        self._text = text
 
     async def json(self) -> dict[str, Any]:
         return self._data
+
+    async def text(self) -> str:
+        return self._text if self._text is not None else json.dumps(self._data)
 
 
 class _FakeChromium:
@@ -376,7 +382,8 @@ async def test_collect_symbol_writes_raw_artifacts_without_second_browser_launch
     tmp_path: Path,
 ) -> None:
     html = _toolbar_html()
-    fake_playwright = _FakePlaywright(lambda: _FakePage(html))
+    api_body = json.dumps(_options_expirations_response(), separators=(",", ":"))
+    fake_playwright = _FakePlaywright(lambda: _FakePage(html, expiration_response_text=api_body))
     _install_fake_playwright(monkeypatch, fake_playwright)
 
     snapshot = await collect_symbol(
@@ -388,7 +395,9 @@ async def test_collect_symbol_writes_raw_artifacts_without_second_browser_launch
     assert snapshot.symbol == "MSFT"
     assert len(snapshot.rows) == 2
     assert (tmp_path / "msft-raw.html").read_text(encoding="utf-8") == html
-    raw_api_json = json.loads((tmp_path / "msft-raw.json").read_text(encoding="utf-8"))
+    raw_api_text = (tmp_path / "msft-raw.json").read_text(encoding="utf-8")
+    assert raw_api_text == api_body
+    raw_api_json = json.loads(raw_api_text)
     assert raw_api_json["data"][1]["expirationType"] == "weekly"
     snapshot_json = json.loads((tmp_path / "msft-snapshot.json").read_text(encoding="utf-8"))
     assert snapshot_json["symbol"] == "MSFT"
