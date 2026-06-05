@@ -23,7 +23,8 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
         captured_at=datetime(2026, 6, 2, 21, 30),
         metrics=TopMetrics("07/22/26", 30.86, 37.28, 29.62, 39.0),
         rows=[
-            ExpirationRow("06/18/26 (m)", date(2026, 6, 18), 16, 11737, 26979, 38716, 0.44, 202821, 226097, 428918, 0.90, 31.92, True)
+            ExpirationRow("06/18/26 (m)", date(2026, 6, 18), 16, 11737, 26979, 38716, 0.44, 202821, 226097, 428918, 0.90, 31.92, True),
+            ExpirationRow("06/26/26 (w)", date(2026, 6, 26), 24, 9104, 19646, 28750, 0.46, 84120, 156882, 241002, 0.54, 32.10, False),
         ],
     )
     analysis = SymbolAnalysis(
@@ -59,6 +60,8 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
     assert "06/18/26 (m)" in html
     assert "Mixed" in html
     assert "NOW-expirations.csv" in html
+    assert "Raw Options Table" in html
+    assert "06/26/26 (w)" in html
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
     assert "# Daily Options Put/Call Report - 2026-06-02" in markdown
     assert "NOW: mixed overall." in markdown
@@ -67,12 +70,14 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
     assert "06/18/26 (m)" in markdown
     assert "Mixed" in markdown
     assert "No previous_day snapshot is available yet." in markdown
+    assert "### Raw Options Table" in markdown
+    assert "06/26/26 (w)" in markdown
     assert f"Raw CSV: {csv_path}" in markdown
     assert str(tmp_path) in markdown
 
     with csv_path.open(encoding="utf-8", newline="") as file:
         csv_rows = list(csv.reader(file))
-    assert len(csv_rows) == 2
+    assert len(csv_rows) == 3
     header = csv_rows[0]
     values = csv_rows[1]
     assert len(header) == len(values)

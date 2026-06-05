@@ -57,10 +57,18 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
             expiration_response = await expiration_response_task
             await _wait_for_top_metrics(page)
             html = await page.content()
-            rows = await _extract_rows_from_api_response(expiration_response, symbol_config.symbol)
+            api_payload = await _api_payload_from_response(expiration_response, symbol_config.symbol)
+            rows = _extract_rows_from_api_payload(api_payload, symbol_config.symbol)
             snapshot = await _snapshot_from_page(page, symbol_config.symbol, symbol_config.url, captured_at, rows=rows)
             (archive_dir / f"{symbol_config.symbol}-raw.html").write_text(html, encoding="utf-8")
-            (archive_dir / f"{symbol_config.symbol}-raw.json").write_text(_snapshot_json(snapshot), encoding="utf-8")
+            (archive_dir / f"{symbol_config.symbol}-raw.json").write_text(
+                json.dumps(api_payload, indent=2),
+                encoding="utf-8",
+            )
+            (archive_dir / f"{symbol_config.symbol}-snapshot.json").write_text(
+                _snapshot_json(snapshot),
+                encoding="utf-8",
+            )
             return snapshot
         except Exception as exc:
             if expiration_response_task is not None:
@@ -261,12 +269,18 @@ async def _extract_rows(page) -> list[ExpirationRow]:
     return rows
 
 
-async def _extract_rows_from_api_response(response, symbol: str) -> list[ExpirationRow]:
+async def _api_payload_from_response(response, symbol: str) -> dict:
     status = getattr(response, "status", None)
     if status is not None and status >= 400:
         raise CollectionError(f"{symbol} options expiration API returned HTTP {status}")
     data = await response.json()
-    rows = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        raise CollectionError(f"{symbol} options expiration API returned an invalid payload")
+    return data
+
+
+def _extract_rows_from_api_payload(data: dict, symbol: str) -> list[ExpirationRow]:
+    rows = data.get("data")
     if not isinstance(rows, list):
         raise CollectionError(f"{symbol} options expiration API returned no data rows")
     return [_api_row_to_expiration_row(row, symbol) for row in rows if isinstance(row, dict)]

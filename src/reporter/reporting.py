@@ -106,6 +106,46 @@ def _drift_markdown(report: SymbolReport) -> list[str]:
     return rows
 
 
+def _raw_rows_html(report: SymbolReport) -> str:
+    if report.snapshot is None or not report.snapshot.rows:
+        return "<p>No raw expiration rows available.</p>"
+    rows = [
+        "<table><tr><th>Expiration</th><th>DTE</th><th>Put Vol</th><th>Call Vol</th><th>Total Vol</th>"
+        "<th>Put/Call Vol</th><th>Put OI</th><th>Call OI</th><th>Total OI</th><th>Put/Call OI</th>"
+        "<th>Implied Volatility</th><th>Monthly</th></tr>"
+    ]
+    for row in report.snapshot.rows:
+        rows.append(
+            "<tr>"
+            f"<td>{escape(row.expiration_label)}</td><td>{row.dte}</td><td>{row.put_volume}</td>"
+            f"<td>{row.call_volume}</td><td>{row.total_volume}</td><td>{row.put_call_volume_ratio:.2f}</td>"
+            f"<td>{row.put_open_interest}</td><td>{row.call_open_interest}</td><td>{row.total_open_interest}</td>"
+            f"<td>{row.put_call_open_interest_ratio:.2f}</td><td>{_metric_cell(row.implied_volatility)}</td>"
+            f"<td>{row.is_monthly}</td>"
+            "</tr>"
+        )
+    rows.append("</table>")
+    return "\n".join(rows)
+
+
+def _raw_rows_markdown(report: SymbolReport) -> list[str]:
+    if report.snapshot is None or not report.snapshot.rows:
+        return ["No raw expiration rows available."]
+    rows = [
+        "| Expiration | DTE | Put Vol | Call Vol | Total Vol | Put/Call Vol | Put OI | Call OI | Total OI | Put/Call OI | Implied Volatility | Monthly |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for row in report.snapshot.rows:
+        rows.append(
+            "| "
+            f"{row.expiration_label} | {row.dte} | {row.put_volume} | {row.call_volume} | {row.total_volume} | "
+            f"{row.put_call_volume_ratio:.2f} | {row.put_open_interest} | {row.call_open_interest} | "
+            f"{row.total_open_interest} | {row.put_call_open_interest_ratio:.2f} | "
+            f"{_metric_text(row.implied_volatility)} | {row.is_monthly} |"
+        )
+    return rows
+
+
 def _raw_csv(report: SymbolReport, archive_dir: Path) -> Path | None:
     if report.snapshot is None:
         return None
@@ -182,6 +222,8 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
         html_sections.append(_monthly_html(report))
         html_sections.append("<h3>Drift</h3>")
         html_sections.append(_drift_html(report))
+        html_sections.append("<h3>Raw Options Table</h3>")
+        html_sections.append(_raw_rows_html(report))
         csv_path = _raw_csv(report, archive_dir)
         if csv_path is not None:
             csv_ref = escape(csv_path.name)
@@ -193,6 +235,8 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
         markdown_sections.extend(_monthly_markdown(report))
         markdown_sections.extend(["", "### Drift"])
         markdown_sections.extend(_drift_markdown(report))
+        markdown_sections.extend(["", "### Raw Options Table"])
+        markdown_sections.extend(_raw_rows_markdown(report))
         if csv_path is not None:
             markdown_sections.extend(["", f"Raw CSV: {csv_path}"])
         markdown_sections.append("")

@@ -388,9 +388,11 @@ async def test_collect_symbol_writes_raw_artifacts_without_second_browser_launch
     assert snapshot.symbol == "MSFT"
     assert len(snapshot.rows) == 2
     assert (tmp_path / "msft-raw.html").read_text(encoding="utf-8") == html
-    raw_json = json.loads((tmp_path / "msft-raw.json").read_text(encoding="utf-8"))
-    assert raw_json["symbol"] == "MSFT"
-    assert raw_json["rows"][1]["expiration_label"] == "06/26/26 (w)"
+    raw_api_json = json.loads((tmp_path / "msft-raw.json").read_text(encoding="utf-8"))
+    assert raw_api_json["data"][1]["expirationType"] == "weekly"
+    snapshot_json = json.loads((tmp_path / "msft-snapshot.json").read_text(encoding="utf-8"))
+    assert snapshot_json["symbol"] == "MSFT"
+    assert snapshot_json["rows"][1]["expiration_label"] == "06/26/26 (w)"
     assert fake_playwright.launch_count == 1
 
 

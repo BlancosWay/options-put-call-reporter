@@ -93,6 +93,19 @@ def test_history_store_uses_nearest_prior_trading_snapshots(tmp_path: Path) -> N
     assert priors["previous_month"].rows[0].put_call_volume_ratio == 0.60
 
 
+def test_history_store_does_not_reuse_previous_day_for_week_or_month(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    now = datetime(2026, 6, 30, 21, 30)
+    store.save_snapshot(snapshot("MSFT", now - timedelta(days=1), 0.40))
+    store.save_snapshot(snapshot("MSFT", now, 0.31))
+
+    priors = store.prior_snapshots("MSFT", now)
+
+    assert priors["previous_day"].rows[0].put_call_volume_ratio == 0.40
+    assert priors["previous_week"] is None
+    assert priors["previous_month"] is None
+
+
 def test_history_store_prior_snapshots_are_symbol_specific_and_exclude_current(
     tmp_path: Path,
 ) -> None:

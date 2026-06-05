@@ -29,10 +29,11 @@ def set_password(service: str, account: str, password: str) -> None:
     failed = False
     try:
         subprocess.run(
-            ["security", "add-generic-password", "-a", account, "-s", service, "-w", password, "-U"],
+            ["security", "add-generic-password", "-a", account, "-s", service, "-U", "-w"],
             check=True,
             capture_output=True,
             text=True,
+            input=f"{password}\n",
         )
     except Exception:
         failed = True

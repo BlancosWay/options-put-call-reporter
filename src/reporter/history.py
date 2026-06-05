@@ -76,13 +76,13 @@ class HistoryStore:
 
     def prior_snapshots(self, symbol: str, captured_at: datetime) -> dict[str, Snapshot | None]:
         return {
-            "previous_day": self._nearest_to(symbol, captured_at, timedelta(days=1)),
-            "previous_week": self._nearest_to(symbol, captured_at, timedelta(days=7)),
-            "previous_month": self._nearest_to(symbol, captured_at, timedelta(days=30)),
+            "previous_day": self._nearest_to(symbol, captured_at, timedelta(days=1), timedelta(hours=36)),
+            "previous_week": self._nearest_to(symbol, captured_at, timedelta(days=7), timedelta(days=3)),
+            "previous_month": self._nearest_to(symbol, captured_at, timedelta(days=30), timedelta(days=7)),
         }
 
     def _nearest_to(
-        self, symbol: str, captured_at: datetime, offset: timedelta
+        self, symbol: str, captured_at: datetime, offset: timedelta, tolerance: timedelta
     ) -> Snapshot | None:
         target = captured_at - offset
         with self._connect() as connection:
@@ -103,7 +103,12 @@ class HistoryStore:
                     target.isoformat(),
                 ),
             ).fetchone()
-        return self._snapshot_from_row(row) if row else None
+        snapshot = self._snapshot_from_row(row) if row else None
+        if snapshot is None:
+            return None
+        if abs(snapshot.captured_at - target) > tolerance:
+            return None
+        return snapshot
 
     @staticmethod
     def _row_to_json(row: ExpirationRow) -> dict[str, Any]:

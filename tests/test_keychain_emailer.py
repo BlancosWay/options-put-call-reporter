@@ -29,16 +29,22 @@ def test_get_password_calls_security_find(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_set_password_calls_security_add(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[list[str]] = []
+    inputs: list[str] = []
 
-    def fake_run(args, check, capture_output, text):
+    def fake_run(args, check, capture_output, text, input=None):
         calls.append(args)
+        inputs.append(input)
         return Completed()
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    set_password("service", "user@gmail.com", "secret")
+    secret = "secret"
+    set_password("service", "user@gmail.com", secret)
     assert "add-generic-password" in calls[0]
     assert "-U" in calls[0]
+    assert calls[0][-1] == "-w"
+    assert secret not in calls[0]
+    assert inputs == [f"{secret}\n"]
 
 
 def test_get_password_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,7 +60,8 @@ def test_get_password_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_set_password_raises_without_leaking_secret_in_exception_chain(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "gmail-app-password-secret"
 
-    def fake_run(args, check, capture_output, text):
+    def fake_run(args, check, capture_output, text, input=None):
+        assert secret not in args
         raise subprocess.CalledProcessError(returncode=1, cmd=args)
 
     monkeypatch.setattr("subprocess.run", fake_run)
