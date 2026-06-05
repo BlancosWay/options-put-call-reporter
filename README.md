@@ -37,6 +37,10 @@ source .venv/bin/activate
 options-put-call-report run --send-email
 ```
 
+## Live collection notes
+
+The collector opens each Barchart put/call page in Chromium, waits for Barchart's live `options-expirations` API response, and waits for the top metrics toolbar before extracting data. If a symbol fails, the run saves HTML and PNG diagnostics in the daily archive folder.
+
 ## Scheduler
 
 Before installing the scheduler, confirm that a manual email run succeeds:
