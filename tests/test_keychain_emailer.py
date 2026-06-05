@@ -82,8 +82,8 @@ def test_send_email_report_uses_tls_and_login(monkeypatch: pytest.MonkeyPatch, t
     sent_messages: list[EmailMessage] = []
 
     class FakeSMTP:
-        def __init__(self, host: str, port: int) -> None:
-            events.append(f"connect:{host}:{port}")
+        def __init__(self, host: str, port: int, *, timeout: float) -> None:
+            events.append(f"connect:{host}:{port}:timeout={timeout:g}")
 
         def __enter__(self):
             return self
@@ -114,7 +114,7 @@ def test_send_email_report_uses_tls_and_login(monkeypatch: pytest.MonkeyPatch, t
     )
 
     assert events == [
-        "connect:smtp.gmail.com:587",
+        "connect:smtp.gmail.com:587:timeout=30",
         "tls",
         "login:sender@gmail.com:abc123",
         "send:recipient@gmail.com",

@@ -8,6 +8,9 @@ from pathlib import Path
 from reporter.models import EmailConfig
 
 
+DEFAULT_SMTP_TIMEOUT_SECONDS = 30
+
+
 class EmailError(RuntimeError):
     pass
 
@@ -29,7 +32,7 @@ def send_email_report(
     message.add_alternative(html, subtype="html")
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as smtp:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=DEFAULT_SMTP_TIMEOUT_SECONDS) as smtp:
             context = ssl.create_default_context()
             smtp.starttls(context=context)
             smtp.login(email_config.from_email, app_password)
