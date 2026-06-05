@@ -42,6 +42,7 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
         browser = await playwright.chromium.launch(headless=True)
         context = None
         page = None
+        expiration_response_task = None
         try:
             context = await browser.new_context(user_agent=BROWSER_USER_AGENT)
             page = await context.new_page()
@@ -62,6 +63,8 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
             (archive_dir / f"{symbol_config.symbol}-raw.json").write_text(_snapshot_json(snapshot), encoding="utf-8")
             return snapshot
         except Exception as exc:
+            if expiration_response_task is not None:
+                expiration_response_task.cancel()
             if page is None:
                 diagnostic_paths, diagnostic_errors = [], ["page was not created"]
             else:

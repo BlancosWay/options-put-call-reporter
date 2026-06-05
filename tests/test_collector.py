@@ -438,6 +438,26 @@ async def test_collect_symbol_fails_fast_on_blocked_http_status(
 
 
 @pytest.mark.asyncio
+async def test_collect_symbol_cleans_response_listener_when_navigation_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage(_toolbar_html(), goto_error=RuntimeError("navigation failed"))
+    fake_playwright = _FakePlaywright(lambda: page)
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    with pytest.raises(CollectionError) as exc_info:
+        await collect_symbol(
+            SymbolConfig("MSFT", "https://example.test/msft"),
+            captured_at=datetime(2026, 6, 2, 21, 30),
+            archive_dir=tmp_path,
+        )
+
+    assert "navigation failed" in str(exc_info.value)
+    assert page.response_listener_events == ["on", "remove"]
+
+
+@pytest.mark.asyncio
 async def test_collect_symbol_reads_expiration_rows_from_barchart_api_response(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
