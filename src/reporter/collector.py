@@ -573,10 +573,10 @@ def _safe_ratio(numerator: int, denominator: int) -> float:
 def _is_standard_monthly_expiration(expiration_date: date) -> bool:
     first_day = expiration_date.replace(day=1)
     third_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7 + 14)
-    juneteenth_friday_observed = third_friday.month == 6 and third_friday.day == 19
-    return expiration_date == third_friday or (
-        juneteenth_friday_observed and expiration_date == third_friday - timedelta(days=1)
-    )
+    juneteenth_displaces_third_friday = third_friday.month == 6 and third_friday.day in {18, 19}
+    if juneteenth_displaces_third_friday:
+        return expiration_date == third_friday - timedelta(days=1)
+    return expiration_date == third_friday
 
 
 def _short_error(error: BaseException) -> str:

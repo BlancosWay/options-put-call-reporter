@@ -683,6 +683,8 @@ def test_extract_yfin_rows_skips_expirations_without_contracts() -> None:
 
 def test_yfin_monthly_detection_only_marks_holiday_thursday_adjustment() -> None:
     assert collector._is_standard_monthly_expiration(date(2026, 6, 18)) is True
+    assert collector._is_standard_monthly_expiration(date(2027, 6, 17)) is True
+    assert collector._is_standard_monthly_expiration(date(2027, 6, 18)) is False
     assert collector._is_standard_monthly_expiration(date(2026, 7, 16)) is False
     assert collector._is_standard_monthly_expiration(date(2026, 7, 17)) is True
 
