@@ -19,6 +19,8 @@ git push -u origin HEAD
 
 If GitHub CLI is unavailable:
 
+Create an empty public GitHub repository named `srinadel/options-put-call-reporter` before running the fallback commands.
+
 ```bash
 git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
 git push -u origin HEAD

@@ -82,6 +82,7 @@ def test_public_docs_describe_existing_assistant_assets() -> None:
 def test_publishing_docs_include_existing_origin_safe_commands() -> None:
     publishing = _read("docs/PUBLISHING.md")
 
+    assert "Create an empty public GitHub repository named `srinadel/options-put-call-reporter` before running the fallback commands." in publishing
     assert "git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git" in publishing
     assert "git push -u origin HEAD" in publishing
     assert "gh repo create srinadel/options-put-call-reporter --public --source=. --remote=origin --push" not in publishing
