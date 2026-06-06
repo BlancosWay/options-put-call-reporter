@@ -470,13 +470,15 @@ def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at:
                 expiration_timestamp = int(expiration)
             except (TypeError, ValueError) as exc:
                 raise CollectionError(f"{symbol} yfin.dev option chain contained invalid expirationDate") from exc
-            grouped_contracts = contracts_by_expiration.setdefault(expiration_timestamp, {"calls": [], "puts": []})
             calls = option_chain.get("calls", [])
             puts = option_chain.get("puts", [])
-            if isinstance(calls, list):
-                grouped_contracts["calls"].extend(contract for contract in calls if isinstance(contract, dict))
-            if isinstance(puts, list):
-                grouped_contracts["puts"].extend(contract for contract in puts if isinstance(contract, dict))
+            valid_calls = [contract for contract in calls if isinstance(contract, dict)] if isinstance(calls, list) else []
+            valid_puts = [contract for contract in puts if isinstance(contract, dict)] if isinstance(puts, list) else []
+            if not valid_calls and not valid_puts:
+                continue
+            grouped_contracts = contracts_by_expiration.setdefault(expiration_timestamp, {"calls": [], "puts": []})
+            grouped_contracts["calls"].extend(valid_calls)
+            grouped_contracts["puts"].extend(valid_puts)
 
     if not contracts_by_expiration:
         raise CollectionError(f"{symbol} yfin.dev payload returned no data rows")
@@ -571,7 +573,10 @@ def _safe_ratio(numerator: int, denominator: int) -> float:
 def _is_standard_monthly_expiration(expiration_date: date) -> bool:
     first_day = expiration_date.replace(day=1)
     third_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7 + 14)
-    return expiration_date in {third_friday, third_friday - timedelta(days=1)}
+    juneteenth_friday_observed = third_friday.month == 6 and third_friday.day == 19
+    return expiration_date == third_friday or (
+        juneteenth_friday_observed and expiration_date == third_friday - timedelta(days=1)
+    )
 
 
 def _short_error(error: BaseException) -> str:

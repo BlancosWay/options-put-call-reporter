@@ -1,7 +1,7 @@
 import html
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -654,6 +654,37 @@ def test_extract_yfin_rows_rejects_payloads_without_data_rows() -> None:
         collector._extract_yfin_rows([_yfin_payload([1781740800], [])], "MSFT", datetime(2026, 6, 2, 21, 30))
 
     assert "MSFT yfin.dev payload returned no data rows" in str(exc_info.value)
+
+
+def test_extract_yfin_rows_rejects_expirations_without_contracts() -> None:
+    payload = _yfin_payload([1781740800], [{"expirationDate": 1781740800, "calls": [], "puts": []}])
+
+    with pytest.raises(CollectionError) as exc_info:
+        collector._extract_yfin_rows([payload], "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert "MSFT yfin.dev payload returned no data rows" in str(exc_info.value)
+
+
+def test_extract_yfin_rows_skips_expirations_without_contracts() -> None:
+    payload = _yfin_payload(
+        [1781740800, 1782432000],
+        [
+            {"expirationDate": 1781740800, "calls": [], "puts": []},
+            {"expirationDate": 1782432000, "calls": [{"volume": 5, "openInterest": 2}], "puts": []},
+        ],
+    )
+
+    rows = collector._extract_yfin_rows([payload], "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert len(rows) == 1
+    assert rows[0].expiration_date == date(2026, 6, 26)
+    assert rows[0].call_volume == 5
+
+
+def test_yfin_monthly_detection_only_marks_holiday_thursday_adjustment() -> None:
+    assert collector._is_standard_monthly_expiration(date(2026, 6, 18)) is True
+    assert collector._is_standard_monthly_expiration(date(2026, 7, 16)) is False
+    assert collector._is_standard_monthly_expiration(date(2026, 7, 17)) is True
 
 
 @pytest.mark.asyncio
