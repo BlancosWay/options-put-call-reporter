@@ -62,6 +62,9 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Not financial advice",
         "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
         "After `ensurepath`, restart your shell",
+        "Falls back to yfin.dev options-chain data when Barchart collection fails.",
+        "Reports disclose the data source used for each symbol.",
+        "`{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
     ]:
         assert text in readme
 
