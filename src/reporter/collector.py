@@ -74,6 +74,7 @@ async def _collect_symbol_from_barchart(
         context = None
         page = None
         expiration_response_task = None
+        collection_error = None
         try:
             browser = await playwright.chromium.launch(headless=True)
             context = await browser.new_context(user_agent=BROWSER_USER_AGENT)
@@ -120,12 +121,22 @@ async def _collect_symbol_from_barchart(
                 message += f"; diagnostics saved to {' and '.join(str(path) for path in diagnostic_paths)}"
             if diagnostic_errors:
                 message += f"; diagnostic capture failed: {'; '.join(diagnostic_errors)}"
-            raise CollectionError(message) from exc
+            collection_error = CollectionError(message)
+            raise collection_error from exc
         finally:
-            if context is not None:
-                await context.close()
-            if browser is not None:
-                await browser.close()
+            cleanup_error = None
+            for resource in (context, browser):
+                if resource is None:
+                    continue
+                try:
+                    await resource.close()
+                except Exception as exc:
+                    if collection_error is not None:
+                        continue
+                    if cleanup_error is None:
+                        cleanup_error = exc
+            if cleanup_error is not None:
+                raise cleanup_error
     except BaseException as exc:
         suppress_exception = await playwright_manager.__aexit__(type(exc), exc, exc.__traceback__)
         if not suppress_exception:

@@ -147,6 +147,7 @@ class _FakeBrowser:
     def __init__(self, playwright: "_FakePlaywright") -> None:
         self._playwright = playwright
         self.closed = False
+        self.close_attempted = False
 
     async def new_context(self, *, user_agent: str) -> "_FakeContext":
         self._playwright.context_user_agents.append(user_agent)
@@ -160,6 +161,9 @@ class _FakeBrowser:
         return page
 
     async def close(self) -> None:
+        self.close_attempted = True
+        if self._playwright.browser_close_error is not None:
+            raise self._playwright.browser_close_error
         self.closed = True
 
 
@@ -167,6 +171,7 @@ class _FakeContext:
     def __init__(self, playwright: "_FakePlaywright") -> None:
         self._playwright = playwright
         self.closed = False
+        self.close_attempted = False
 
     async def new_page(self) -> _FakePage:
         page = self._playwright.new_page()
@@ -174,6 +179,7 @@ class _FakeContext:
         return page
 
     async def close(self) -> None:
+        self.close_attempted = True
         if self._playwright.context_close_error is not None:
             raise self._playwright.context_close_error
         self.closed = True
@@ -215,11 +221,13 @@ class _FakePlaywright:
         launch_error: Exception | None = None,
         enter_error: Exception | None = None,
         context_close_error: Exception | None = None,
+        browser_close_error: Exception | None = None,
     ) -> None:
         self._page_factory = page_factory
         self.launch_error = launch_error
         self.enter_error = enter_error
         self.context_close_error = context_close_error
+        self.browser_close_error = browser_close_error
         self.chromium = _FakeChromium(self)
         self.launch_count = 0
         self.pages: list[_FakePage] = []
@@ -653,6 +661,48 @@ async def test_collect_symbol_falls_back_to_yfin_when_playwright_startup_fails(
     assert snapshot.data_source.is_fallback is True
     assert snapshot.data_source.note == "Fallback after Barchart failed: playwright startup failed"
     assert snapshot.rows[0].put_volume == 3
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_barchart_and_cleanup_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage("<html>blocked</html>", goto_error=RuntimeError("primary blocked"))
+    fake_playwright = _FakePlaywright(
+        lambda: page,
+        context_close_error=RuntimeError("context close failed"),
+        browser_close_error=RuntimeError("browser close failed"),
+    )
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        assert symbol == "MSFT"
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: primary blocked"
+    assert snapshot.rows[0].put_volume == 3
+    assert fake_playwright.contexts[0].close_attempted is True
+    assert fake_playwright.browsers[0].close_attempted is True
 
 
 @pytest.mark.asyncio
