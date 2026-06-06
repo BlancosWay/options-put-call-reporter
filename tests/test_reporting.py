@@ -62,6 +62,21 @@ def _assert_has_class(html: str, class_name: str) -> None:
     assert re.search(rf'class="[^"]*\b{re.escape(class_name)}\b[^"]*"', html), f"missing class {class_name}"
 
 
+def _extract_element_by_class(html: str, tag: str, class_name: str) -> str:
+    pattern = (
+        rf'<{tag}\b[^>]*class="[^"]*\b{re.escape(class_name)}\b[^"]*"[^>]*>'
+        rf'.*?</{tag}>'
+    )
+    match = re.search(pattern, html, flags=re.DOTALL)
+    assert match, f"missing {tag}.{class_name}"
+    return match.group(0)
+
+
+def _assert_contains_all(output: str, expected_values: list[str]) -> None:
+    for expected in expected_values:
+        assert expected in output
+
+
 def _layout_bundle(tmp_path: Path) -> ReportBundle:
     return render_reports(
         generated_at=datetime(2026, 6, 2, 21, 35),
@@ -84,6 +99,7 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
     bundle = _layout_bundle(tmp_path)
 
     html = bundle.html_path.read_text(encoding="utf-8")
+    markdown = bundle.markdown_path.read_text(encoding="utf-8")
     assert "<style" in html
     _assert_has_class(html, "report-shell")
     _assert_has_class(html, "summary-table")
@@ -99,33 +115,71 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
     _assert_has_class(html, "raw-data-panel")
     _assert_has_class(html, "raw-options-table")
     assert len(re.findall(r'class="[^"]*\bsymbol-card\b[^"]*"', html)) >= 2
-    assert "NOW-expirations.csv" in html
-    assert "META-expirations.csv" in html
+
+    summary_table = _extract_element_by_class(html, "table", "summary-table")
+    _assert_contains_all(
+        summary_table,
+        [
+            "NOW",
+            "META",
+            "ERR",
+            "Bullish",
+            "Bearish / hedging-heavy",
+            "Failed",
+            "fetch timed out",
+            "NOW-expirations.csv",
+            "META-expirations.csv",
+        ],
+    )
+    assert "ERR-expirations.csv" not in summary_table
     assert str(tmp_path) in html
 
-    for expected in [
-        "NOW",
-        "META",
-        "ERR",
-        "NOW: bullish call demand remains constructive.",
-        "META: bearish hedging remains elevated.",
-        "07/22/26",
-        "30.86",
-        "37.28",
-        "2026-06",
-        "2026-07",
-        "Bullish",
-        "Mixed",
-        "Bearish / hedging-heavy",
-        "06/18/26 (m)",
-        "06/26/26 (w)",
-        "previous_day",
-        "NOW drift summary: volume cooled while open interest stayed elevated.",
-        "META drift summary: volume cooled while open interest stayed elevated.",
-        "2026-07: Bullish -&gt; Mixed / caution",
-        "fetch timed out",
-    ]:
-        assert expected in html
+    _assert_contains_all(
+        html,
+        [
+            "NOW",
+            "META",
+            "ERR",
+            "NOW: bullish call demand remains constructive.",
+            "META: bearish hedging remains elevated.",
+            "07/22/26",
+            "30.86",
+            "37.28",
+            "2026-06",
+            "2026-07",
+            "Bullish",
+            "Mixed",
+            "Bearish / hedging-heavy",
+            "06/18/26 (m)",
+            "06/26/26 (w)",
+            "previous_day",
+            "NOW drift summary: volume cooled while open interest stayed elevated.",
+            "META drift summary: volume cooled while open interest stayed elevated.",
+            "2026-07: Bullish -&gt; Mixed / caution",
+            "fetch timed out",
+        ],
+    )
+    _assert_contains_all(
+        markdown,
+        [
+            "## META",
+            "## ERR",
+            "META: bearish hedging remains elevated.",
+            "ERR: fetch timed out",
+            "Failed: fetch timed out",
+            "2026-07: Bullish -> Mixed / caution",
+            "06/18/26 (m)",
+            "06/26/26 (w)",
+            "2026-06 | 06/18/26 (m) | 0.44 | 0.90",
+            "2026-07 | 07/17/26 (m) | 0.61 | 1.34",
+            "07/22/26",
+            "30.86",
+            "37.28",
+            "NOW-expirations.csv",
+            "META-expirations.csv",
+        ],
+    )
+    assert str(tmp_path) in markdown
 
 
 def test_render_reports_comma_formats_large_human_facing_numbers(tmp_path: Path) -> None:
@@ -133,13 +187,28 @@ def test_render_reports_comma_formats_large_human_facing_numbers(tmp_path: Path)
 
     html = bundle.html_path.read_text(encoding="utf-8")
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
+    formatted_values = [
+        "11,737",
+        "26,979",
+        "202,821",
+        "226,097",
+        "9,104",
+        "19,646",
+        "28,750",
+        "84,120",
+        "156,882",
+        "241,002",
+        "38,716",
+        "428,918",
+        "1,234,567",
+        "7,654,321",
+    ]
+    unformatted_values = [value.replace(",", "") for value in formatted_values]
     for output in (html, markdown):
-        assert "1,234,567" in output
-        assert "428,918" in output
-        assert "38,716" in output
-        assert "1234567" not in output
-        assert "428918" not in output
-        assert "38716" not in output
+        for value in formatted_values:
+            assert value in output
+        for value in unformatted_values:
+            assert value not in output
 
 
 def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
