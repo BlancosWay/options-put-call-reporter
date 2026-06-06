@@ -139,3 +139,30 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         content = _read(native_file)
         for text in ["config/symbols.json", "archive/YYYY-MM-DD", "data/history.sqlite3", "pytest -q", "python -m build", "Barchart"]:
             assert text in content, f"{native_file} missing {text}"
+
+
+def test_github_ci_runs_tests_and_package_build() -> None:
+    ci = _read(".github/workflows/ci.yml")
+
+    for text in [
+        "push:",
+        "pull_request:",
+        "python-version: ['3.11', '3.12']",
+        "python -m pip install -e \".[dev]\"",
+        "python -m playwright install chromium",
+        "pytest -q",
+        "python -m build",
+    ]:
+        assert text in ci
+
+
+def test_dependabot_updates_actions_and_python_dependencies() -> None:
+    dependabot = _read(".github/dependabot.yml")
+
+    for text in [
+        "package-ecosystem: \"github-actions\"",
+        "directory: \"/\"",
+        "package-ecosystem: \"pip\"",
+        "interval: \"weekly\"",
+    ]:
+        assert text in dependabot

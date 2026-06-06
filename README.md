@@ -134,7 +134,7 @@ pytest -q
 python -m build
 ```
 
-The publishing release checklist adds GitHub Actions CI for Python 3.11 and 3.12.
+CI runs the test suite on Python 3.11 and 3.12 and builds the package.
 
 ## Troubleshooting
 
