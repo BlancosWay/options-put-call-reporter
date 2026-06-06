@@ -211,6 +211,28 @@ def test_run_missing_symbols_file_prints_clear_error(tmp_path: Path, capsys) -> 
     assert "Traceback" not in captured.err
 
 
+def test_run_invalid_utf8_symbols_file_prints_clear_error(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    symbols_file = tmp_path / "watchlist.txt"
+    _config(config_path)
+    symbols_file.write_bytes(b"META\n\xff\xfe\n")
+
+    exit_code = main([
+        "run",
+        "--config",
+        str(config_path),
+        "--symbols-file",
+        str(symbols_file),
+        "--no-email",
+    ])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert f"Could not read symbols file {symbols_file}" in captured.err
+    assert "UTF-8 text" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_run_reports_partial_failures_without_stopping(monkeypatch, tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     _config(config_path, symbols=["NOW", "MSFT"])
