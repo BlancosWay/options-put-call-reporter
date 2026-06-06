@@ -104,6 +104,8 @@ archive/YYYY-MM-DD/
 
 The HTML report summarizes each symbol with a monthly signal, put/call ratios, drift from prior saved runs, and the data source used for that symbol.
 
+Successful Barchart collection writes `{SYMBOL}-raw.html` and `{SYMBOL}-raw.json`. If Barchart extraction fails before fallback succeeds or the symbol fails completely, failure diagnostics are written as `{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`.
+
 ## How to read the signal
 
 - **Put/call ratio:** compares put activity to call activity. Higher values are more put-heavy; lower values are more call-heavy.
@@ -140,6 +142,7 @@ By default, reports and raw collection artifacts are written under `archive/YYYY
 - `{SYMBOL}-expirations.csv` - raw expiration table.
 - `{SYMBOL}-snapshot.json` - normalized snapshot.
 - `{SYMBOL}-raw.json` and `{SYMBOL}-raw.html` - collection diagnostics.
+- `{SYMBOL}-failure.html` and `{SYMBOL}-failure.png` - Barchart extraction failure diagnostics.
 - `{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.
 
 History is stored in `data/history.sqlite3`.
@@ -213,7 +216,7 @@ CI runs the test suite on Python 3.11 and 3.12 and builds the package.
 | --- | --- | --- |
 | `options-put-call-report` is not found after install | Shell has not picked up pipx's PATH update | Restart the shell or source your shell profile after `python3 -m pipx ensurepath`. |
 | Browser collection fails immediately | Playwright Chromium is missing | For pipx installs, run `python3 -m pipx run --spec playwright playwright install chromium`. In a checkout, run `python -m playwright install chromium`. |
-| Barchart collection fails for one symbol | Barchart page or network response failed | Inspect `archive/YYYY-MM-DD/{SYMBOL}-raw.html` and `{SYMBOL}-raw.json`; the tool may use yfin.dev fallback. |
+| Barchart collection fails for one symbol | Barchart page or network response failed | Inspect `archive/YYYY-MM-DD/{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`; if fallback succeeds, also inspect `{SYMBOL}-yfin-raw.json`. |
 | Report uses yfin.dev fallback | Barchart failed and fallback succeeded | Check the report data-source disclosure and `{SYMBOL}-yfin-raw.json`; Barchart-only IV Rank/Percentile metrics may be unavailable. |
 | Email send fails | Gmail App Password or local recipient config is missing | Run `options-put-call-report setup-email` and confirm `config/email.local.json` exists locally. |
 | Fresh install has no `config/symbols.json` | GitHub install uses packaged defaults | Run without a config file to use packaged defaults, or pass symbols in the terminal or via `--symbols-file`. |

@@ -75,6 +75,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Symptom",
         "Likely cause",
         "Fix",
+        "`{SYMBOL}-failure.html`",
+        "`{SYMBOL}-failure.png`",
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
     ]:
@@ -88,6 +90,8 @@ def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
         "CLI orchestration",
         "src/reporter/cli.py",
         "Barchart primary collection",
+        "{SYMBOL}-failure.html",
+        "{SYMBOL}-failure.png",
         "yfin.dev fallback",
         "DataSource",
         "src/reporter/collector.py",

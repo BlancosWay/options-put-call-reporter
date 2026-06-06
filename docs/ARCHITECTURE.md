@@ -16,7 +16,9 @@
 
 ### Barchart primary collection
 
-Barchart primary collection uses Playwright Chromium through `src/reporter/collector.py`. The collector archives raw diagnostics as `{SYMBOL}-raw.html` and `{SYMBOL}-raw.json` so failures can be investigated without repeating the live request.
+Barchart primary collection uses Playwright Chromium through `src/reporter/collector.py`. Successful extraction archives raw captures as `{SYMBOL}-raw.html` and `{SYMBOL}-raw.json`.
+
+If Barchart extraction fails, the collector writes failure diagnostics as `{SYMBOL}-failure.html` and `{SYMBOL}-failure.png` before either falling back to yfin.dev or reporting the symbol failure.
 
 ### yfin.dev fallback
 
