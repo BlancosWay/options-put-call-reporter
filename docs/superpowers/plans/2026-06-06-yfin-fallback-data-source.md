@@ -49,8 +49,8 @@
 
 ## Task 4: Final verification and publish
 
-- [ ] Run `pytest -q`.
-- [ ] Run `python -m build`.
-- [ ] Commit the fallback implementation.
+- [x] Run `pytest -q`.
+- [x] Run `python -m build`.
+- [x] Commit the fallback implementation.
 - [ ] Push `HEAD` to `origin main`.
 - [ ] Confirm GitHub Actions passes for `main`.
