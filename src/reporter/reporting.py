@@ -4,6 +4,7 @@ import csv
 from datetime import datetime
 from html import escape
 from pathlib import Path
+from urllib.parse import urlparse
 
 from reporter.models import ReportBundle, Signal, SymbolReport
 
@@ -86,18 +87,26 @@ def _source_label(report: SymbolReport) -> str:
     return f"{source.name}{suffix}"
 
 
+def _is_http_url(url: str) -> bool:
+    try:
+        return urlparse(url).scheme.lower() in {"http", "https"}
+    except ValueError:
+        return False
+
+
 def _source_html(report: SymbolReport) -> str:
     if report.snapshot is None:
         return "—"
     source = report.snapshot.data_source
     label = _source_label(report)
-    linked_label = (
-        f'<a href="{escape(source.url, quote=True)}">{escape(label)}</a>'
-        if source.url
-        else escape(label)
-    )
+    escaped_label = escape(label)
+    if source.url and _is_http_url(source.url):
+        source_text = f'<a href="{escape(source.url, quote=True)}">{escaped_label}</a>'
+    else:
+        url_text = f" — {escape(source.url)}" if source.url else ""
+        source_text = f"{escaped_label}{url_text}"
     note = f" — {escape(source.note)}" if source.note else ""
-    return f"Data source: {linked_label}{note}"
+    return f"Data source: {source_text}{note}"
 
 
 def _source_markdown(report: SymbolReport) -> list[str]:

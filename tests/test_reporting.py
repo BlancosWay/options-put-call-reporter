@@ -715,6 +715,41 @@ def test_render_reports_discloses_data_sources_in_html_markdown_and_csv(tmp_path
     assert now_csv_rows[0]["data_source_note"] == ""
 
 
+def test_render_reports_renders_non_http_source_urls_as_plain_escaped_text(tmp_path: Path) -> None:
+    evil_source = DataSource(
+        name="evil",
+        url="javascript:alert(1)",
+        is_fallback=True,
+        note="bad <note>",
+    )
+    bundle = render_reports(
+        generated_at=datetime(2026, 6, 2, 21, 35),
+        symbol_reports=[
+            _successful_symbol_report_with_source(
+                "META",
+                Signal.BEARISH_HEDGING,
+                "META: bearish hedging remains elevated.",
+                evil_source,
+            )
+        ],
+        archive_dir=tmp_path,
+    )
+
+    html = bundle.html_path.read_text(encoding="utf-8")
+    meta_detail = _extract_symbol_detail_block(html, "META")
+    assert 'href="javascript:alert(1)"' not in meta_detail
+    assert "<note>" not in meta_detail
+    _assert_contains_all(
+        meta_detail,
+        [
+            "Data source:",
+            "evil (fallback)",
+            "javascript:alert(1)",
+            "bad &lt;note&gt;",
+        ],
+    )
+
+
 def test_render_reports_uses_dash_for_missing_metrics(tmp_path: Path) -> None:
     snapshot = Snapshot(
         symbol="EMPTY",
