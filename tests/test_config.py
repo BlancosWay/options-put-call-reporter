@@ -59,6 +59,18 @@ def test_load_config_returns_typed_values(tmp_path: Path) -> None:
     assert config.thresholds.strong_bullish_volume_max == 0.35
 
 
+def test_load_config_uses_packaged_default_when_default_repo_config_is_absent(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    loaded = load_config(Path("config/symbols.json"))
+
+    assert loaded.archive_dir == Path("archive")
+    assert loaded.database_path == Path("data/history.sqlite3")
+    assert [symbol.symbol for symbol in loaded.symbols] == ["META", "GOOG", "MSFT", "NFLX", "NOW", "AAOI", "LITE"]
+
+
 def test_load_config_rejects_missing_symbols(tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     write_config(config_path, {"symbols": []})

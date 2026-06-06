@@ -5,23 +5,52 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "options-put-call-reporter"
 version = "0.1.0"
-description = "Daily Barchart put/call ratio report generator"
+description = "Daily Barchart put/call ratio sentiment report generator"
+readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
+authors = [
+  { name = "Sri", email = "srinadel@users.noreply.github.com" }
+]
+maintainers = [
+  { name = "Sri", email = "srinadel@users.noreply.github.com" }
+]
+keywords = ["options", "put-call-ratio", "barchart", "sentiment", "reporting", "playwright"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Financial and Insurance Industry",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business :: Financial",
+  "Topic :: Utilities"
+]
 dependencies = [
   "playwright>=1.46,<2"
 ]
 
 [project.optional-dependencies]
 dev = [
+  "build>=1,<2",
   "pytest>=8,<9",
   "pytest-asyncio>=0.23,<1"
 ]
+
+[project.urls]
+Repository = "https://github.com/srinadel/options-put-call-reporter"
+Issues = "https://github.com/srinadel/options-put-call-reporter/issues"
+Documentation = "https://github.com/srinadel/options-put-call-reporter#readme"
 
 [project.scripts]
 options-put-call-report = "reporter.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+reporter = ["default_symbols.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

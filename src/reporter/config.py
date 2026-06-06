@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from importlib import resources
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -14,6 +15,7 @@ class ConfigError(ValueError):
 
 
 SYMBOL_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9.-]*$")
+DEFAULT_CONFIG_PATH = Path("config/symbols.json")
 
 
 def _require_string(data: dict[str, Any], key: str) -> str:
@@ -125,9 +127,7 @@ def _symbols(data: dict[str, Any]) -> list[SymbolConfig]:
     return symbols
 
 
-def load_config(path: str | Path) -> AppConfig:
-    config_path = Path(path)
-    data = json.loads(config_path.read_text(encoding="utf-8"))
+def _config_from_data(data: Any) -> AppConfig:
     if not isinstance(data, dict):
         raise ConfigError("Config root must be an object")
     return AppConfig(
@@ -140,3 +140,14 @@ def load_config(path: str | Path) -> AppConfig:
         thresholds=_thresholds(data),
         symbols=_symbols(data),
     )
+
+
+def _load_default_config_data() -> Any:
+    return json.loads(resources.files("reporter").joinpath("default_symbols.json").read_text(encoding="utf-8"))
+
+
+def load_config(path: str | Path) -> AppConfig:
+    config_path = Path(path)
+    if config_path == DEFAULT_CONFIG_PATH and not config_path.exists():
+        return _config_from_data(_load_default_config_data())
+    return _config_from_data(json.loads(config_path.read_text(encoding="utf-8")))
