@@ -223,9 +223,8 @@ def test_parse_symbol_tokens_accepts_spaces_commas_case_and_comments() -> None:
     ]
 
 
-def test_parse_symbol_tokens_rejects_duplicates_after_uppercase() -> None:
-    with pytest.raises(ConfigError, match="Duplicate symbol 'NOW'"):
-        config.parse_symbol_tokens(["now", "MSFT", "NOW"])
+def test_parse_symbol_tokens_dedupes_duplicates_after_uppercase() -> None:
+    assert config.parse_symbol_tokens(["now", "MSFT", "NOW", "msft"]) == ["NOW", "MSFT"]
 
 
 def test_parse_symbol_tokens_rejects_invalid_symbols() -> None:
@@ -238,10 +237,11 @@ def test_load_symbol_file_accepts_plain_text_symbols_commas_spaces_and_comments(
     path.write_text(
         """
         # mega-cap watchlist
-        meta, msft
+        meta, msft, META
         now aaoi # growth names
 
         lite
+        now
         """,
         encoding="utf-8",
     )

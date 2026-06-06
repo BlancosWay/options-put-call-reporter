@@ -78,7 +78,7 @@ def parse_symbol_tokens(values: list[str]) -> list[str]:
             if not SYMBOL_PATTERN.fullmatch(token):
                 raise ConfigError(f"Invalid symbol '{raw_token.strip()}'")
             if token in seen:
-                raise ConfigError(f"Duplicate symbol '{token}'")
+                continue
             seen.add(token)
             symbols.append(token)
     if not symbols:
@@ -88,7 +88,13 @@ def parse_symbol_tokens(values: list[str]) -> list[str]:
 
 def load_symbol_file(path: str | Path) -> list[str]:
     symbol_path = Path(path)
-    return parse_symbol_tokens(symbol_path.read_text(encoding="utf-8").splitlines())
+    try:
+        content = symbol_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(f"Could not read symbols file {symbol_path}: {exc.strerror}") from exc
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"Could not read symbols file {symbol_path}: file must be UTF-8 text") from exc
+    return parse_symbol_tokens(content.splitlines())
 
 
 def symbols_from_names(names: list[str]) -> list[SymbolConfig]:
