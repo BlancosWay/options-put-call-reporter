@@ -700,7 +700,7 @@ git add README.md docs/ARCHITECTURE.md docs/MAINTENANCE.md docs/PUBLISHING.md CO
 git commit -m "docs: improve user and maintainer documentation" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-- [ ] **Step 4: Request code review**
+- [x] **Step 4: Request code review**
 
 Use `superpowers:requesting-code-review` on the branch diff against `origin/main`. Important review focus:
 
