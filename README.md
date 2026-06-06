@@ -30,6 +30,8 @@ source .venv/bin/activate
 options-put-call-report run --no-email
 ```
 
+Runs print concise progress by default, including the symbol count, each symbol collection step, report rendering, and email send status when email is enabled.
+
 Run a one-off report for symbols entered in the terminal:
 
 ```bash
@@ -90,3 +92,5 @@ Logs are written to:
 - `archive/runner.log`
 - `archive/launchd.out.log`
 - `archive/launchd.err.log`
+
+The scheduled runner captures the same concise progress output in these logs, so a daily run can be checked without waiting for the final report.

@@ -170,6 +170,29 @@ def test_run_without_symbol_override_uses_config_symbols(monkeypatch, tmp_path: 
     assert collected == ["NOW", "MSFT"]
 
 
+def test_run_no_email_prints_concise_progress(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path, symbols=["NOW", "MSFT"])
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    exit_code = main(["run", "--config", str(config_path), "--no-email", "--run-date", "2026-06-02T21:30:00"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Starting options report for 2 symbols: NOW, MSFT" in captured.out
+    assert "[1/2] Collecting NOW..." in captured.out
+    assert "[1/2] NOW complete: 1 monthly signals, 1 raw rows" in captured.out
+    assert "[2/2] Collecting MSFT..." in captured.out
+    assert "[2/2] MSFT complete: 1 monthly signals, 1 raw rows" in captured.out
+    assert "Rendering report..." in captured.out
+    assert "Report written to" in captured.out
+    assert captured.err == ""
+
+
 def test_run_rejects_symbols_file_combined_with_positional_symbols(tmp_path: Path, capsys) -> None:
     config_path = tmp_path / "symbols.json"
     symbols_file = tmp_path / "watchlist.txt"
@@ -233,7 +256,7 @@ def test_run_invalid_utf8_symbols_file_prints_clear_error(tmp_path: Path, capsys
     assert "Traceback" not in captured.err
 
 
-def test_run_reports_partial_failures_without_stopping(monkeypatch, tmp_path: Path) -> None:
+def test_run_reports_partial_failures_without_stopping(monkeypatch, tmp_path: Path, capsys) -> None:
     config_path = tmp_path / "symbols.json"
     _config(config_path, symbols=["NOW", "MSFT"])
 
@@ -251,6 +274,12 @@ def test_run_reports_partial_failures_without_stopping(monkeypatch, tmp_path: Pa
     assert "Barchart blocked MSFT" in report_html
     assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("NOW") is not None
     assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("MSFT") is None
+    captured = capsys.readouterr()
+    assert "[1/2] Collecting NOW..." in captured.out
+    assert "[1/2] NOW complete: 1 monthly signals, 1 raw rows" in captured.out
+    assert "[2/2] Collecting MSFT..." in captured.out
+    assert "[2/2] MSFT failed: Barchart blocked MSFT" in captured.out
+    assert "Rendering report..." in captured.out
 
 
 def test_run_returns_nonzero_when_all_symbols_fail(monkeypatch, tmp_path: Path) -> None:
@@ -270,7 +299,28 @@ def test_run_returns_nonzero_when_all_symbols_fail(monkeypatch, tmp_path: Path) 
     assert "No usable symbol data was collected for this run. All configured symbols failed." in report_html
 
 
-def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: Path) -> None:
+def test_run_progress_omits_raw_symbol_url_from_failure(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        raise RuntimeError(f"Fetch failed for {symbol_config.url}?bc_debug=true\nsecond diagnostic line")
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    exit_code = main(["run", "--config", str(config_path), "--no-email", "--run-date", "2026-06-02T21:30:00"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "[1/1] NOW failed: Fetch failed for <url omitted>" in captured.out
+    terminal_output = captured.out + captured.err
+    assert "https://www.barchart.com/stocks/quotes/now/put-call-ratios" not in terminal_output
+    assert "https://www.barchart.com/stocks/quotes/now/put-call-ratios?bc_debug=true" not in terminal_output
+    assert "bc_debug=true" not in terminal_output
+    assert "second diagnostic line" not in terminal_output
+
+
+def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: Path, capsys) -> None:
     config_path = tmp_path / "symbols.json"
     email_config_path = tmp_path / "email.local.json"
     _config(config_path)
@@ -308,6 +358,11 @@ def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: P
     assert sent["smtp_port"] == 587
     assert sent["subject"] == "Complete Options Put/Call Report - 2026-06-02"
     assert Path(sent["html_path"]).name == "report.html"
+    captured = capsys.readouterr()
+    assert "Sending email..." in captured.out
+    assert "Email sent." in captured.out
+    assert "app-password" not in captured.out
+    assert "app-password" not in captured.err
 
 
 def test_run_send_email_failure_prints_clear_error_and_keeps_report(

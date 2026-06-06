@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import getpass
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -15,8 +16,10 @@ from reporter.drift import build_drift
 from reporter.emailer import send_email_report
 from reporter.history import HistoryStore
 from reporter.keychain import get_password, set_password
-from reporter.models import EmailConfig, SymbolAnalysis, SymbolReport
+from reporter.models import EmailConfig, SymbolAnalysis, SymbolConfig, SymbolReport
 from reporter.reporting import render_reports
+
+_URL_PATTERN = re.compile(r"https?://\S+")
 
 
 def _load_email_config(path: Path) -> EmailConfig:
@@ -35,6 +38,20 @@ def _write_email_config(path: Path, email_config: EmailConfig) -> None:
     )
 
 
+def _progress(message: str) -> None:
+    print(message, flush=True)
+
+
+def _short_symbol_error(exc: Exception, symbol_config: SymbolConfig) -> str:
+    raw_message = str(exc).strip()
+    message = raw_message.splitlines()[0] if raw_message else exc.__class__.__name__
+    message = _URL_PATTERN.sub("<url omitted>", message)
+    message = message.replace(symbol_config.url, "<url omitted>")
+    if len(message) > 160:
+        return f"{message[:157]}..."
+    return message
+
+
 def _run_symbols(args: argparse.Namespace, default_symbols):
     if args.symbols_file:
         return symbols_from_names(load_symbol_file(args.symbols_file))
@@ -50,8 +67,13 @@ async def _run_async(args: argparse.Namespace) -> int:
     run_archive = config.archive_dir / captured_at.strftime("%Y-%m-%d")
     store = HistoryStore(config.database_path)
     symbol_reports: list[SymbolReport] = []
+    total_symbols = len(run_symbols)
+    symbol_names = ", ".join(symbol.symbol for symbol in run_symbols)
 
-    for symbol_config in run_symbols:
+    _progress(f"Starting options report for {total_symbols} symbols: {symbol_names}")
+    for index, symbol_config in enumerate(run_symbols, start=1):
+        progress_prefix = f"[{index}/{total_symbols}]"
+        _progress(f"{progress_prefix} Collecting {symbol_config.symbol}...")
         try:
             snapshot = await collect_symbol(symbol_config, captured_at, run_archive)
             store.save_snapshot(snapshot)
@@ -63,7 +85,12 @@ async def _run_async(args: argparse.Namespace) -> int:
             }
             drift = build_drift(analysis, prior_analyses, config.thresholds)
             symbol_reports.append(SymbolReport(symbol=snapshot.symbol, snapshot=snapshot, analysis=analysis, drift=drift))
+            _progress(
+                f"{progress_prefix} {snapshot.symbol} complete: "
+                f"{len(analysis.monthly_signals)} monthly signals, {len(snapshot.rows)} raw rows"
+            )
         except Exception as exc:
+            _progress(f"{progress_prefix} {symbol_config.symbol} failed: {_short_symbol_error(exc, symbol_config)}")
             symbol_reports.append(
                 SymbolReport(
                     symbol=symbol_config.symbol,
@@ -74,6 +101,7 @@ async def _run_async(args: argparse.Namespace) -> int:
                 )
             )
 
+    _progress("Rendering report...")
     bundle = render_reports(captured_at, symbol_reports, run_archive)
     failures = [report for report in symbol_reports if report.error]
     successes = [report for report in symbol_reports if not report.error]
@@ -81,6 +109,7 @@ async def _run_async(args: argparse.Namespace) -> int:
 
     if args.send_email:
         try:
+            _progress("Sending email...")
             email_config = _load_email_config(args.email_config)
             app_password = get_password(config.keychain_service, email_config.from_email)
             subject_status = "FAILED" if not successes else "Partial" if failures else "Complete"
@@ -92,11 +121,12 @@ async def _run_async(args: argparse.Namespace) -> int:
                 subject=f"{subject_status} Options Put/Call Report - {captured_at:%Y-%m-%d}",
                 html_path=bundle.html_path,
             )
+            _progress("Email sent.")
         except Exception as exc:
             print(f"Email was not sent: {exc}. Report remains at {bundle.html_path}", file=sys.stderr)
             exit_code = 1
 
-    print(f"Report written to {bundle.html_path}")
+    _progress(f"Report written to {bundle.html_path}")
     return exit_code
 
 
