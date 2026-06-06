@@ -29,14 +29,14 @@
 
 ## Task 2: yfin fallback collector
 
-- [ ] Write failing collector tests that simulate Barchart failure and yfin success.
-- [ ] Add a private `_collect_symbol_from_barchart()` containing the current Playwright implementation.
-- [ ] Make `collect_symbol()` try Barchart first, then yfin on `CollectionError`.
-- [ ] Add yfin HTTP helpers using `asyncio.to_thread()` around `urllib.request.urlopen()`.
-- [ ] Aggregate yfin calls/puts into `ExpirationRow` values. Deduplicate repeated contracts per expiration and side using `contractSymbol` when present; for no-symbol contracts, use side, expiration, strike, and position within the side chain without payload or option-chain indexes. Compute denominator-zero ratios as `0.0` only when the numerator is also zero; otherwise use infinity.
-- [ ] Archive fallback raw JSON as `{symbol}-yfin-raw.json` and snapshot JSON as before.
-- [ ] If yfin also fails, raise `CollectionError` with both primary and fallback causes.
-- [ ] Run `pytest tests/test_collector.py -q`.
+- [x] Write failing collector tests that simulate Barchart failure and yfin success.
+- [x] Add a private `_collect_symbol_from_barchart()` containing the current Playwright implementation.
+- [x] Make `collect_symbol()` try Barchart first, then yfin on `CollectionError`.
+- [x] Add yfin HTTP helpers using `asyncio.to_thread()` around `urllib.request.urlopen()`.
+- [x] Aggregate yfin calls/puts into `ExpirationRow` values. Deduplicate repeated contracts per expiration and side using `contractSymbol` when present; for no-symbol contracts, use side, expiration, strike, and position within the side chain without payload or option-chain indexes. Compute denominator-zero ratios as `0.0` only when the numerator is also zero; otherwise use infinity.
+- [x] Archive fallback raw JSON as `{symbol}-yfin-raw.json` and snapshot JSON as before.
+- [x] If yfin also fails, raise `CollectionError` with both primary and fallback causes.
+- [x] Run `pytest tests/test_collector.py -q`.
 
 ## Task 3: Source disclosure in generated files
 

@@ -63,6 +63,8 @@ async def _collect_symbol_from_barchart(
 ) -> Snapshot:
     archive_dir.mkdir(parents=True, exist_ok=True)
     playwright_manager = async_playwright()
+    # Manual async context manager flow lets startup/teardown failures become
+    # collection failures without allowing teardown to bypass yfin fallback.
     try:
         playwright = await playwright_manager.__aenter__()
     except Exception as exc:
@@ -138,7 +140,12 @@ async def _collect_symbol_from_barchart(
             if cleanup_error is not None:
                 raise cleanup_error
     except BaseException as exc:
-        suppress_exception = await playwright_manager.__aexit__(type(exc), exc, exc.__traceback__)
+        try:
+            suppress_exception = await playwright_manager.__aexit__(type(exc), exc, exc.__traceback__)
+        except Exception:
+            if isinstance(exc, CollectionError):
+                raise exc
+            raise
         if not suppress_exception:
             raise
     else:

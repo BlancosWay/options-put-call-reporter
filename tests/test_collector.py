@@ -220,12 +220,14 @@ class _FakePlaywright:
         *,
         launch_error: Exception | None = None,
         enter_error: Exception | None = None,
+        exit_error: Exception | None = None,
         context_close_error: Exception | None = None,
         browser_close_error: Exception | None = None,
     ) -> None:
         self._page_factory = page_factory
         self.launch_error = launch_error
         self.enter_error = enter_error
+        self.exit_error = exit_error
         self.context_close_error = context_close_error
         self.browser_close_error = browser_close_error
         self.chromium = _FakeChromium(self)
@@ -244,6 +246,8 @@ class _FakePlaywright:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
+        if self.exit_error is not None:
+            raise self.exit_error
         return None
 
 
@@ -703,6 +707,45 @@ async def test_collect_symbol_falls_back_to_yfin_when_barchart_and_cleanup_fail(
     assert snapshot.rows[0].put_volume == 3
     assert fake_playwright.contexts[0].close_attempted is True
     assert fake_playwright.browsers[0].close_attempted is True
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_barchart_and_playwright_manager_exit_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage("<html>blocked</html>", goto_error=RuntimeError("primary blocked"))
+    fake_playwright = _FakePlaywright(
+        lambda: page,
+        exit_error=RuntimeError("playwright manager exit failed"),
+    )
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        assert symbol == "MSFT"
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: primary blocked"
+    assert snapshot.rows[0].put_volume == 3
 
 
 @pytest.mark.asyncio
