@@ -681,6 +681,37 @@ def test_extract_yfin_rows_skips_expirations_without_contracts() -> None:
     assert rows[0].call_volume == 5
 
 
+def test_extract_yfin_rows_deduplicates_contract_symbols_by_side_and_expiration() -> None:
+    expiration = 1781740800
+    duplicate_chain = {
+        "expirationDate": expiration,
+        "calls": [{"contractSymbol": "MSFT260618C00100000", "volume": 10, "openInterest": 100}],
+        "puts": [{"contractSymbol": "MSFT260618P00100000", "volume": 4, "openInterest": 40}],
+    }
+    distinct_chain = {
+        "expirationDate": expiration,
+        "calls": [{"contractSymbol": "MSFT260618C00105000", "volume": 5, "openInterest": 50}],
+        "puts": [{"contractSymbol": "MSFT260618P00105000", "volume": 8, "openInterest": 80}],
+    }
+    payloads = [
+        _yfin_payload([expiration], [duplicate_chain]),
+        _yfin_payload([expiration], [duplicate_chain, distinct_chain]),
+    ]
+
+    rows = collector._extract_yfin_rows(payloads, "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.put_volume == 12
+    assert row.call_volume == 15
+    assert row.total_volume == 27
+    assert row.put_call_volume_ratio == 0.8
+    assert row.put_open_interest == 120
+    assert row.call_open_interest == 150
+    assert row.total_open_interest == 270
+    assert row.put_call_open_interest_ratio == 0.8
+
+
 def test_yfin_monthly_detection_only_marks_holiday_thursday_adjustment() -> None:
     assert collector._is_standard_monthly_expiration(date(2026, 6, 18)) is True
     assert collector._is_standard_monthly_expiration(date(2027, 6, 17)) is True

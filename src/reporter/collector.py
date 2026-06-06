@@ -461,8 +461,9 @@ def _extract_yfin_option_expirations(payload: dict[str, Any], symbol: str) -> se
 
 def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at: datetime) -> list[ExpirationRow]:
     contracts_by_expiration: dict[int, dict[str, list[dict[str, Any]]]] = {}
-    for payload in payloads:
-        for option_chain in _yfin_options(payload, symbol):
+    seen_contracts: dict[int, dict[str, set[tuple[str, str]]]] = {}
+    for payload_index, payload in enumerate(payloads):
+        for option_chain_index, option_chain in enumerate(_yfin_options(payload, symbol)):
             expiration = option_chain.get("expirationDate")
             if expiration is None:
                 raise CollectionError(f"{symbol} yfin.dev option chain missing expirationDate")
@@ -477,8 +478,27 @@ def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at:
             if not valid_calls and not valid_puts:
                 continue
             grouped_contracts = contracts_by_expiration.setdefault(expiration_timestamp, {"calls": [], "puts": []})
-            grouped_contracts["calls"].extend(valid_calls)
-            grouped_contracts["puts"].extend(valid_puts)
+            seen_for_expiration = seen_contracts.setdefault(expiration_timestamp, {"calls": set(), "puts": set()})
+            grouped_contracts["calls"].extend(
+                _deduplicate_yfin_contracts(
+                    valid_calls,
+                    "calls",
+                    expiration_timestamp,
+                    payload_index,
+                    option_chain_index,
+                    seen_for_expiration["calls"],
+                )
+            )
+            grouped_contracts["puts"].extend(
+                _deduplicate_yfin_contracts(
+                    valid_puts,
+                    "puts",
+                    expiration_timestamp,
+                    payload_index,
+                    option_chain_index,
+                    seen_for_expiration["puts"],
+                )
+            )
 
     if not contracts_by_expiration:
         raise CollectionError(f"{symbol} yfin.dev payload returned no data rows")
@@ -489,6 +509,47 @@ def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at:
     ]
     rows.sort(key=lambda row: row.expiration_date)
     return rows
+
+
+def _deduplicate_yfin_contracts(
+    contracts: list[dict[str, Any]],
+    side: str,
+    expiration_timestamp: int,
+    payload_index: int,
+    option_chain_index: int,
+    seen: set[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    unique_contracts: list[dict[str, Any]] = []
+    for contract_index, contract in enumerate(contracts):
+        identity = _yfin_contract_identity(
+            contract,
+            side,
+            expiration_timestamp,
+            payload_index,
+            option_chain_index,
+            contract_index,
+        )
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique_contracts.append(contract)
+    return unique_contracts
+
+
+def _yfin_contract_identity(
+    contract: dict[str, Any],
+    side: str,
+    expiration_timestamp: int,
+    payload_index: int,
+    option_chain_index: int,
+    contract_index: int,
+) -> tuple[str, str]:
+    contract_symbol = contract.get("contractSymbol")
+    if isinstance(contract_symbol, str) and contract_symbol.strip():
+        return ("contractSymbol", contract_symbol.strip())
+    strike = contract.get("strike")
+    fallback_key = f"{side}:{expiration_timestamp}:{strike!r}:{payload_index}:{option_chain_index}:{contract_index}"
+    return ("position", fallback_key)
 
 
 def _yfin_result(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
