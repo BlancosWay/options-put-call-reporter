@@ -47,8 +47,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
 
     readme = _read("README.md")
     for text in [
-        "pipx install git+https://github.com/srinadel/options-put-call-reporter.git",
-        "pipx run --spec playwright playwright install chromium",
+        "python3 -m pipx install git+https://github.com/srinadel/options-put-call-reporter.git",
+        "python3 -m pipx run --spec playwright playwright install chromium",
         "python -m playwright install chromium",
         "options-put-call-report run --no-email",
         "options-put-call-report run --no-email META MSFT NOW",
@@ -57,6 +57,21 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Not financial advice",
     ]:
         assert text in readme
+
+
+def test_public_docs_do_not_claim_future_assets_exist_before_they_are_added() -> None:
+    readme = _read("README.md")
+
+    assert "See `assistant-pack/README.md`" not in readme
+    assert "CI runs the test suite" not in readme
+
+
+def test_publishing_docs_include_existing_origin_safe_commands() -> None:
+    publishing = _read("docs/PUBLISHING.md")
+
+    assert "git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git" in publishing
+    assert "git push -u origin HEAD" in publishing
+    assert "gh repo create srinadel/options-put-call-reporter --public --source=. --remote=origin --push" not in publishing
 
 
 def test_gitignore_covers_public_repo_runtime_and_build_artifacts() -> None:

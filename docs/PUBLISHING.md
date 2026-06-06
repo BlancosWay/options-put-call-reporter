@@ -5,7 +5,14 @@ Target repository: `https://github.com/srinadel/options-put-call-reporter`
 ## Create the public repository with GitHub CLI
 
 ```bash
-gh repo create srinadel/options-put-call-reporter --public --source=. --remote=origin --push
+gh repo create srinadel/options-put-call-reporter --public
+```
+
+Then set or update `origin` and push the current branch:
+
+```bash
+git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
+git push -u origin HEAD
 ```
 
 ## Manual fallback
@@ -14,7 +21,7 @@ If GitHub CLI is unavailable:
 
 ```bash
 git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
-git push -u origin feature/daily-options-report
+git push -u origin HEAD
 ```
 
 Then open GitHub, create a pull request into `main`, and require the CI workflow before merging.

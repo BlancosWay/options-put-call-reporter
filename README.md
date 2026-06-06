@@ -19,8 +19,8 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 ```bash
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
-pipx install git+https://github.com/srinadel/options-put-call-reporter.git
-pipx run --spec playwright playwright install chromium
+python3 -m pipx install git+https://github.com/srinadel/options-put-call-reporter.git
+python3 -m pipx run --spec playwright playwright install chromium
 ```
 
 For development:
@@ -114,15 +114,7 @@ The scheduled runner captures the same concise progress output in these logs.
 
 ## Assistant pack
 
-This repository includes assistant instructions for maintaining and operating the tool:
-
-- `AGENTS.md` for Codex-style agents.
-- `CLAUDE.md` for Claude Code.
-- `GEMINI.md` for Gemini CLI.
-- `.github/copilot-instructions.md` for GitHub Copilot.
-- `assistant-pack/` for portable skill/prompt files.
-
-See `assistant-pack/README.md` for copy/install guidance.
+This publishing branch adds assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini. The assistant-pack files are part of the full publishing release checklist.
 
 ## Development
 
@@ -132,11 +124,11 @@ pytest -q
 python -m build
 ```
 
-CI runs the test suite on Python 3.11 and 3.12 and builds the package.
+The publishing release checklist includes GitHub Actions CI for Python 3.11 and 3.12.
 
 ## Troubleshooting
 
-- If Barchart collection fails after a GitHub/pipx install, run `pipx run --spec playwright playwright install chromium`.
+- If Barchart collection fails after a GitHub/pipx install, run `python3 -m pipx run --spec playwright playwright install chromium`.
 - In a development checkout, install Chromium with `python -m playwright install chromium`.
 - If a symbol fails, inspect the daily `archive/YYYY-MM-DD/` diagnostics.
 - If email fails, confirm the Gmail App Password is present in Keychain and the recipient config exists.
