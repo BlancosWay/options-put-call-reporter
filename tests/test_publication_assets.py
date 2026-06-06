@@ -17,12 +17,15 @@ def test_pyproject_has_public_github_metadata() -> None:
 
     assert project["name"] == "options-put-call-reporter"
     assert project["readme"] == "README.md"
-    assert project["license"] == {"file": "LICENSE"}
+    assert project["license"] == "MIT"
+    assert project["license-files"] == ["LICENSE"]
     assert "Development Status :: 4 - Beta" in project["classifiers"]
+    assert "License :: OSI Approved :: MIT License" not in project["classifiers"]
     assert "Topic :: Office/Business :: Financial" in project["classifiers"]
     assert project["urls"]["Repository"] == "https://github.com/srinadel/options-put-call-reporter"
     assert project["urls"]["Issues"] == "https://github.com/srinadel/options-put-call-reporter/issues"
     assert "build>=1,<2" in data["project"]["optional-dependencies"]["dev"]
+    assert "setuptools>=77.0.3" in data["build-system"]["requires"]
 
 
 def test_packaged_default_config_is_included_as_package_data() -> None:
@@ -149,7 +152,9 @@ def test_github_ci_runs_tests_and_package_build() -> None:
         "pull_request:",
         "python-version: ['3.11', '3.12']",
         "python -m pip install -e \".[dev]\"",
-        "python -m playwright install chromium",
+        "python -m playwright install --with-deps chromium",
+        "permissions:",
+        "contents: read",
         "pytest -q",
         "python -m build",
     ]:
