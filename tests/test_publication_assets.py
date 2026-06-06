@@ -45,6 +45,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "SECURITY.md",
         "CODE_OF_CONDUCT.md",
         "docs/PUBLISHING.md",
+        "docs/ARCHITECTURE.md",
+        "docs/MAINTENANCE.md",
     ]
 
     for path in required_files:
@@ -65,8 +67,62 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Falls back to yfin.dev options-chain data when Barchart collection fails.",
         "Reports disclose the data source used for each symbol.",
         "`{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
+        "## Table of contents",
+        "## What this produces",
+        "## How to read the signal",
+        "## Data sources and fallback behavior",
+        "## CLI command reference",
+        "Symptom",
+        "Likely cause",
+        "Fix",
+        "docs/ARCHITECTURE.md",
+        "docs/MAINTENANCE.md",
     ]:
         assert text in readme
+
+
+def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
+    architecture = _read("docs/ARCHITECTURE.md")
+
+    for text in [
+        "CLI orchestration",
+        "src/reporter/cli.py",
+        "Barchart primary collection",
+        "yfin.dev fallback",
+        "DataSource",
+        "src/reporter/collector.py",
+        "src/reporter/analyzer.py",
+        "src/reporter/history.py",
+        "src/reporter/reporting.py",
+        "archive/YYYY-MM-DD/",
+        "data/history.sqlite3",
+        "macOS Keychain",
+        "launchd",
+        "Safe change points",
+    ]:
+        assert text in architecture
+
+
+def test_maintenance_doc_covers_ci_dependabot_and_release_workflow() -> None:
+    maintenance = _read("docs/MAINTENANCE.md")
+
+    for text in [
+        "pytest -q",
+        "python -m build",
+        "protected `main`",
+        "Python 3.11",
+        "Python 3.12",
+        "Dependabot auto-merge",
+        "semver patch and minor",
+        "major updates remain manual",
+        "github.event.pull_request.user.login",
+        "gh pr checks",
+        "gh run list",
+        "archive/",
+        "data/",
+        "config/email.local.json",
+    ]:
+        assert text in maintenance
 
 
 def test_public_docs_describe_existing_assistant_assets() -> None:
@@ -170,6 +226,8 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "GitHub Copilot",
         "Codex",
         "Gemini",
+        "docs/ARCHITECTURE.md",
+        "docs/MAINTENANCE.md",
     ]:
         assert text in combined
 

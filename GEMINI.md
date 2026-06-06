@@ -17,5 +17,7 @@ options-put-call-report run --no-email
 - Do not expose Gmail App Passwords; they are stored in macOS Keychain.
 - Keep local runtime output in ignored paths only.
 - Config lives in `config/symbols.json`; reports and diagnostics live in `archive/YYYY-MM-DD/`; history lives in `data/history.sqlite3`.
+- `docs/ARCHITECTURE.md` explains runtime flow, source metadata, module responsibilities, and safe change points.
+- `docs/MAINTENANCE.md` explains local validation, protected `main`, CI, Dependabot auto-merge, and release workflow.
 - Run `pytest -q` and `python -m build` before publishing changes.
 - Keep Barchart/Playwright collection changes isolated in `src/reporter/collector.py`.

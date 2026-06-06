@@ -2,6 +2,8 @@
 
 Target repository: `https://github.com/BlancosWay/options-put-call-reporter`
 
+For ongoing branch protection, CI, Dependabot, and release maintenance after the repository exists, see `docs/MAINTENANCE.md`.
+
 ## Create the public repository with GitHub CLI
 
 ```bash

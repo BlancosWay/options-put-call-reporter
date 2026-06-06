@@ -26,7 +26,7 @@
 **Files:**
 - Modify: `tests/test_publication_assets.py`
 
-- [ ] **Step 1: Extend required public docs**
+- [x] **Step 1: Extend required public docs**
 
 Add `docs/ARCHITECTURE.md` and `docs/MAINTENANCE.md` to the required public files in `test_public_repository_docs_exist_and_cover_required_topics()`:
 
@@ -43,7 +43,7 @@ Add `docs/ARCHITECTURE.md` and `docs/MAINTENANCE.md` to the required public file
     ]
 ```
 
-- [ ] **Step 2: Add README topic assertions**
+- [x] **Step 2: Add README topic assertions**
 
 Add these strings to the README assertion list in `test_public_repository_docs_exist_and_cover_required_topics()`:
 
@@ -60,7 +60,7 @@ Add these strings to the README assertion list in `test_public_repository_docs_e
         "docs/MAINTENANCE.md",
 ```
 
-- [ ] **Step 3: Add architecture/maintenance doc tests**
+- [x] **Step 3: Add architecture/maintenance doc tests**
 
 Append these tests to `tests/test_publication_assets.py`:
 
@@ -109,7 +109,7 @@ def test_maintenance_doc_covers_ci_dependabot_and_release_workflow() -> None:
         assert text in maintenance
 ```
 
-- [ ] **Step 4: Require assistant docs to point to deeper docs**
+- [x] **Step 4: Require assistant docs to point to deeper docs**
 
 In `test_assistant_instruction_pack_targets_all_supported_agents()`, add `docs/ARCHITECTURE.md` and `docs/MAINTENANCE.md` to the combined text assertion list:
 
@@ -118,7 +118,7 @@ In `test_assistant_instruction_pack_targets_all_supported_agents()`, add `docs/A
         "docs/MAINTENANCE.md",
 ```
 
-- [ ] **Step 5: Run focused test and confirm RED**
+- [x] **Step 5: Run focused test and confirm RED**
 
 Run:
 
@@ -133,7 +133,7 @@ Expected: fails because `docs/ARCHITECTURE.md`, `docs/MAINTENANCE.md`, and new R
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Rewrite README with the approved structure**
+- [x] **Step 1: Rewrite README with the approved structure**
 
 Replace `README.md` with content that preserves existing install/run commands and adds these sections in order:
 
@@ -365,7 +365,7 @@ Do not commit `config/email.local.json`, Gmail app passwords, `archive/`, or `da
 MIT. See `LICENSE`.
 ```
 
-- [ ] **Step 2: Run focused docs test and confirm README assertions pass or only deeper docs fail**
+- [x] **Step 2: Run focused docs test and confirm README assertions pass or only deeper docs fail**
 
 Run:
 
@@ -382,7 +382,7 @@ Expected: still fails until `docs/ARCHITECTURE.md`, `docs/MAINTENANCE.md`, and s
 - Create: `docs/MAINTENANCE.md`
 - Modify: `docs/PUBLISHING.md`
 
-- [ ] **Step 1: Create architecture doc**
+- [x] **Step 1: Create architecture doc**
 
 Create `docs/ARCHITECTURE.md`:
 
@@ -450,7 +450,7 @@ The macOS launchd scheduler scripts live under `scripts/`. Scheduled runs write 
 - Change assistant guidance in `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.github/instructions/options-reporter.instructions.md`, and `assistant-pack/`.
 ```
 
-- [ ] **Step 2: Create maintenance doc**
+- [x] **Step 2: Create maintenance doc**
 
 Create `docs/MAINTENANCE.md`:
 
@@ -556,7 +556,7 @@ Update `docs/ARCHITECTURE.md` when module responsibilities, data flow, persisten
 Update assistant docs when commands, safety rules, or repo layout changes.
 ```
 
-- [ ] **Step 3: Link publishing guide to maintenance**
+- [x] **Step 3: Link publishing guide to maintenance**
 
 Add this paragraph after the target repository line in `docs/PUBLISHING.md`:
 
@@ -564,7 +564,7 @@ Add this paragraph after the target repository line in `docs/PUBLISHING.md`:
 For ongoing branch protection, CI, Dependabot, and release maintenance after the repository exists, see `docs/MAINTENANCE.md`.
 ```
 
-- [ ] **Step 4: Run focused docs tests**
+- [x] **Step 4: Run focused docs tests**
 
 Run:
 
@@ -586,7 +586,7 @@ Expected: still fails until contributor and assistant docs link to the deeper do
 - Modify: `.github/copilot-instructions.md`
 - Modify: `.github/instructions/options-reporter.instructions.md`
 
-- [ ] **Step 1: Update CONTRIBUTING.md**
+- [x] **Step 1: Update CONTRIBUTING.md**
 
 Add this section after "Pull request expectations":
 
@@ -608,7 +608,7 @@ Add this section after "Pull request expectations":
 - `docs/MAINTENANCE.md` explains validation, protected `main`, CI, Dependabot, and release workflow.
 ```
 
-- [ ] **Step 2: Update SECURITY.md**
+- [x] **Step 2: Update SECURITY.md**
 
 Add this sentence to the "Sensitive data" section:
 
@@ -616,7 +616,7 @@ Add this sentence to the "Sensitive data" section:
 See `docs/MAINTENANCE.md` for the generated-file checklist used before publishing changes.
 ```
 
-- [ ] **Step 3: Update assistant-pack/README.md**
+- [x] **Step 3: Update assistant-pack/README.md**
 
 Add this section before "Safety":
 
@@ -627,7 +627,7 @@ Add this section before "Safety":
 - `docs/MAINTENANCE.md` explains local validation, protected `main`, CI, Dependabot auto-merge, and release workflow.
 ```
 
-- [ ] **Step 4: Update root assistant instruction files**
+- [x] **Step 4: Update root assistant instruction files**
 
 Add this "Reference docs" section to `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`:
 
@@ -638,7 +638,7 @@ Add this "Reference docs" section to `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`:
 - `docs/MAINTENANCE.md` explains local validation, protected `main`, CI, Dependabot auto-merge, and release workflow.
 ```
 
-- [ ] **Step 5: Update Copilot instruction files**
+- [x] **Step 5: Update Copilot instruction files**
 
 Add these bullets to `.github/copilot-instructions.md` under "Locations":
 
@@ -654,7 +654,7 @@ Add these bullets to `.github/instructions/options-reporter.instructions.md`:
 - Maintenance guide: `docs/MAINTENANCE.md`.
 ```
 
-- [ ] **Step 6: Run focused docs tests and confirm GREEN**
+- [x] **Step 6: Run focused docs tests and confirm GREEN**
 
 Run:
 
@@ -669,7 +669,7 @@ Expected: all publication asset tests pass.
 **Files:**
 - All documentation and test files changed in Tasks 1-4.
 
-- [ ] **Step 1: Run full local checks**
+- [x] **Step 1: Run full local checks**
 
 Run:
 
@@ -680,7 +680,7 @@ Run:
 
 Expected: all tests pass and package build succeeds.
 
-- [ ] **Step 2: Inspect diff**
+- [x] **Step 2: Inspect diff**
 
 Run:
 
