@@ -113,6 +113,17 @@ def _assert_html_row_contains(block: str, row_marker: str, expected_values: list
     _assert_contains_all(_html_row_containing(block, row_marker), expected_values)
 
 
+def _html_first_row_containing(block: str, value: str) -> str:
+    rows = re.findall(r"<tr\b[^>]*>.*?</tr>", block, flags=re.DOTALL)
+    matches = [row for row in rows if value in row]
+    assert matches, f"expected at least one row containing {value!r}"
+    return matches[0]
+
+
+def _assert_first_html_row_contains(block: str, row_marker: str, expected_values: list[str]) -> None:
+    _assert_contains_all(_html_first_row_containing(block, row_marker), expected_values)
+
+
 def _extract_symbol_detail_block(html: str, symbol: str) -> str:
     card_pattern = (
         r'<section\b[^>]*class="[^"]*\bsymbol-card\b[^"]*"[^>]*>'
@@ -191,6 +202,9 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
     html = bundle.html_path.read_text(encoding="utf-8")
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
     assert "<style" in html
+    assert "display: flex" not in html
+    assert "display: grid" not in html
+    assert "box-shadow" not in html
     _assert_has_class(html, "report-shell")
     _assert_has_class(html, "summary-table")
     _assert_has_class(html, "symbol-card")
@@ -302,12 +316,20 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
             "META-expirations.csv",
         ],
     )
-    assert "438,716" in _html_row_containing(now_detail, "2026-06")
-    assert "7,654,321" in _html_row_containing(now_detail, "2026-07")
-    assert "8,111,111" in _html_row_containing(meta_detail, "2026-07")
+    assert "438,716" in _html_first_row_containing(now_detail, "2026-06")
+    assert "7,654,321" in _html_first_row_containing(now_detail, "2026-07")
+    assert "8,111,111" in _html_first_row_containing(meta_detail, "2026-07")
     assert "1,333,333" in _html_row_containing(meta_detail, "44.44")
     assert "META drift summary" not in now_detail
     assert "NOW drift summary" not in meta_detail
+    now_drift_table = _extract_element_by_class(now_detail, "table", "drift-table")
+    _assert_contains_all(now_drift_table, ["2026-07: Bullish -&gt; Mixed / caution"])
+    assert "&#8209;" not in now_drift_table
+    assert now_detail.count("2026-07: Bullish -&gt; Mixed / caution") == 1
+    meta_drift_table = _extract_element_by_class(meta_detail, "table", "drift-table")
+    _assert_contains_all(meta_drift_table, ["2026-07: Neutral -&gt; Bearish / hedging-heavy"])
+    assert "&#8209;" not in meta_drift_table
+    assert meta_detail.count("2026-07: Neutral -&gt; Bearish / hedging-heavy") == 1
 
     _assert_contains_all(
         html,
@@ -458,8 +480,8 @@ def test_render_reports_comma_formats_large_human_facing_numbers(tmp_path: Path)
     now_detail = _extract_symbol_detail_block(html, "NOW")
     meta_detail = _extract_symbol_detail_block(html, "META")
 
-    _assert_html_row_contains(now_detail, "2026-06", ["438,716", "528,918"])
-    _assert_html_row_contains(now_detail, "2026-07", ["1,234,567", "7,654,321"])
+    _assert_first_html_row_contains(now_detail, "2026-06", ["438,716", "528,918"])
+    _assert_first_html_row_contains(now_detail, "2026-07", ["1,234,567", "7,654,321"])
     _assert_html_row_contains(
         now_detail,
         "31.92",
@@ -470,8 +492,8 @@ def test_render_reports_comma_formats_large_human_facing_numbers(tmp_path: Path)
         "32.1",
         ["9,104", "19,646", "28,750", "84,120", "156,882", "241,002"],
     )
-    _assert_html_row_contains(meta_detail, "2026-07", ["8,111,111", "1,444,444"])
-    _assert_html_row_contains(meta_detail, "2026-08", ["654,321", "987,654"])
+    _assert_first_html_row_contains(meta_detail, "2026-07", ["8,111,111", "1,444,444"])
+    _assert_first_html_row_contains(meta_detail, "2026-08", ["654,321", "987,654"])
     _assert_html_row_contains(
         meta_detail,
         "44.44",
