@@ -83,12 +83,25 @@ class ExpirationRow:
 
 
 @dataclass(frozen=True)
+class DataSource:
+    name: str
+    url: str
+    is_fallback: bool = False
+    note: str | None = None
+
+
+def default_barchart_source() -> DataSource:
+    return DataSource(name="Barchart", url="https://www.barchart.com", is_fallback=False)
+
+
+@dataclass(frozen=True)
 class Snapshot:
     symbol: str
     url: str
     captured_at: datetime
     metrics: TopMetrics
     rows: list[ExpirationRow]
+    data_source: DataSource = field(default_factory=default_barchart_source)
 
 
 @dataclass(frozen=True)
