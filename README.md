@@ -12,7 +12,7 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 - Supports default symbols, terminal symbols, or a plain-text symbol file.
 - Sends Gmail reports using a macOS Keychain-stored app password.
 - Includes launchd scheduling scripts for local daily runs on macOS.
-- Planned publishing assets include assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
+- Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
 
 ## Install from GitHub
 
@@ -116,7 +116,15 @@ The scheduled runner captures the same concise progress output in these logs.
 
 ## Assistant pack
 
-Planned publishing assets include assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini. The assistant-pack files are part of the full publishing release checklist and are added in a later task on this branch.
+This repository includes assistant instructions for maintaining and operating the tool:
+
+- `AGENTS.md` for Codex-style agents.
+- `CLAUDE.md` for Claude Code.
+- `GEMINI.md` for Gemini CLI.
+- `.github/copilot-instructions.md` for GitHub Copilot.
+- `assistant-pack/` for portable skill/prompt files.
+
+See `assistant-pack/README.md` for copy/install guidance.
 
 ## Development
 

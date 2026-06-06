@@ -55,19 +55,25 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "options-put-call-report setup-email",
         "launchd",
         "Not financial advice",
-        "Planned publishing assets include assistant instructions",
+        "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
         "After `ensurepath`, restart your shell",
     ]:
         assert text in readme
 
 
-def test_public_docs_do_not_claim_future_assets_exist_before_they_are_added() -> None:
+def test_public_docs_describe_existing_assistant_assets() -> None:
     readme = _read("README.md")
 
-    assert "See `assistant-pack/README.md`" not in readme
-    assert "CI runs the test suite" not in readme
-    assert "Ships assistant instructions" not in readme
-    assert "This publishing branch adds assistant instructions" not in readme
+    for text in [
+        "This repository includes assistant instructions for maintaining and operating the tool:",
+        "`AGENTS.md` for Codex-style agents.",
+        "`CLAUDE.md` for Claude Code.",
+        "`GEMINI.md` for Gemini CLI.",
+        "`.github/copilot-instructions.md` for GitHub Copilot.",
+        "`assistant-pack/` for portable skill/prompt files.",
+        "See `assistant-pack/README.md` for copy/install guidance.",
+    ]:
+        assert text in readme
 
 
 def test_publishing_docs_include_existing_origin_safe_commands() -> None:
@@ -93,3 +99,43 @@ def test_gitignore_covers_public_repo_runtime_and_build_artifacts() -> None:
         ".env",
     ]:
         assert pattern in gitignore
+
+
+def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
+    required_files = [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        ".github/copilot-instructions.md",
+        ".github/instructions/options-reporter.instructions.md",
+        "assistant-pack/README.md",
+        "assistant-pack/claude/options-put-call-reporter/SKILL.md",
+        "assistant-pack/prompts/options-report-agent.md",
+    ]
+
+    for path in required_files:
+        assert (ROOT / path).exists(), path
+
+    combined = "\n".join(_read(path) for path in required_files)
+    for text in [
+        "options-put-call-report run --no-email",
+        "pytest -q",
+        "python -m build",
+        "python -m playwright install chromium",
+        "config/symbols.json",
+        "archive/YYYY-MM-DD",
+        "data/history.sqlite3",
+        "Barchart",
+        "macOS Keychain",
+        "not financial advice",
+        "Claude Code",
+        "GitHub Copilot",
+        "Codex",
+        "Gemini",
+    ]:
+        assert text in combined
+
+    for native_file in ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"]:
+        content = _read(native_file)
+        for text in ["config/symbols.json", "archive/YYYY-MM-DD", "data/history.sqlite3", "pytest -q", "python -m build", "Barchart"]:
+            assert text in content, f"{native_file} missing {text}"
