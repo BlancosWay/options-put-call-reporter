@@ -1,10 +1,33 @@
 # Options Put/Call Reporter
 
-Local daily reporter for Barchart put/call ratio pages.
+Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool collects live options-expiration data, classifies monthly put/call signals, tracks historical drift, renders clean HTML/Markdown/CSV reports, and can optionally email the report through Gmail.
 
-## Setup
+> Not financial advice. This project summarizes options sentiment data for research and automation. Verify all market data independently before making trading or investment decisions.
+
+## Features
+
+- Collects Barchart put/call ratio data with Playwright Chromium.
+- Produces a clean HTML dashboard plus Markdown and CSV outputs.
+- Tracks history in SQLite and reports day/week/month drift where prior data exists.
+- Supports default symbols, terminal symbols, or a plain-text symbol file.
+- Sends Gmail reports using a macOS Keychain-stored app password.
+- Includes launchd scheduling scripts for local daily runs on macOS.
+- Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
+
+## Install from GitHub
 
 ```bash
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+pipx install git+https://github.com/srinadel/options-put-call-reporter.git
+pipx run --spec playwright playwright install chromium
+```
+
+For development:
+
+```bash
+git clone https://github.com/srinadel/options-put-call-reporter.git
+cd options-put-call-reporter
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -12,21 +35,11 @@ python -m pip install -e ".[dev]"
 python -m playwright install chromium
 ```
 
-## Gmail setup
+## Quickstart
 
-Run the interactive setup command. It asks for the sender email, recipient email, and Gmail App Password. The app password is stored in macOS Keychain under `options-put-call-reporter:gmail-app-password`.
-
-```bash
-source .venv/bin/activate
-options-put-call-report setup-email
-```
-
-## Manual run
-
-Save the report locally without sending email:
+Run the default watchlist and save the report locally:
 
 ```bash
-source .venv/bin/activate
 options-put-call-report run --no-email
 ```
 
@@ -38,13 +51,13 @@ Run a one-off report for symbols entered in the terminal:
 options-put-call-report run --no-email META MSFT NOW
 ```
 
-Run a one-off report from a plain text symbol file:
+Run from a plain text symbol file:
 
 ```bash
 options-put-call-report run --no-email --symbols-file watchlist.txt
 ```
 
-The symbol file can use one symbol per line, spaces, commas, and `#` comments:
+Symbol files can use one symbol per line, spaces, commas, and `#` comments:
 
 ```text
 # watchlist.txt
@@ -53,44 +66,86 @@ NOW AAOI
 LITE  # comments are ignored
 ```
 
-Collect, analyze, archive, and send email:
+## Outputs
+
+By default, reports and raw collection artifacts are written under `archive/YYYY-MM-DD/`:
+
+- `report.html` - polished dashboard report.
+- `report.md` - Markdown report.
+- `{SYMBOL}-expirations.csv` - raw expiration table.
+- `{SYMBOL}-snapshot.json` - normalized snapshot.
+- `{SYMBOL}-raw.json` and `{SYMBOL}-raw.html` - collection diagnostics.
+
+History is stored in `data/history.sqlite3`.
+
+## Email setup
+
+Run the interactive setup command. It asks for sender email, recipient email, and a Gmail App Password. The app password is stored in macOS Keychain under `options-put-call-reporter:gmail-app-password`.
 
 ```bash
-source .venv/bin/activate
+options-put-call-report setup-email
 options-put-call-report run --send-email
 ```
 
-## Live collection notes
-
-The collector opens each Barchart put/call page in Chromium, waits for Barchart's live `options-expirations` API response, and waits for the top metrics toolbar before extracting data. If a symbol fails, the run saves HTML and PNG diagnostics in the daily archive folder.
+The local email config is written to `config/email.local.json`, which is intentionally ignored by git.
 
 ## Scheduler
 
 Before installing the scheduler, confirm that a manual email run succeeds:
 
 ```bash
-source .venv/bin/activate
 options-put-call-report run --send-email
 ```
 
-Install the launchd job:
+Install the launchd job from a cloned checkout:
 
 ```bash
 ./scripts/install_launch_agent.sh
-```
-
-The scheduled job runs at 2:30 PM Pacific Time, which corresponds to 5:30 PM Eastern Time.
-
-Check scheduler status:
-
-```bash
 launchctl list | grep com.sri.options-put-call-reporter
 ```
 
-Logs are written to:
+The scheduled job runs at 2:30 PM Pacific Time, which corresponds to 5:30 PM Eastern Time. Logs are written to:
 
 - `archive/runner.log`
 - `archive/launchd.out.log`
 - `archive/launchd.err.log`
 
-The scheduled runner captures the same concise progress output in these logs, so a daily run can be checked without waiting for the final report.
+The scheduled runner captures the same concise progress output in these logs.
+
+## Assistant pack
+
+This repository includes assistant instructions for maintaining and operating the tool:
+
+- `AGENTS.md` for Codex-style agents.
+- `CLAUDE.md` for Claude Code.
+- `GEMINI.md` for Gemini CLI.
+- `.github/copilot-instructions.md` for GitHub Copilot.
+- `assistant-pack/` for portable skill/prompt files.
+
+See `assistant-pack/README.md` for copy/install guidance.
+
+## Development
+
+```bash
+source .venv/bin/activate
+pytest -q
+python -m build
+```
+
+CI runs the test suite on Python 3.11 and 3.12 and builds the package.
+
+## Troubleshooting
+
+- If Barchart collection fails after a GitHub/pipx install, run `pipx run --spec playwright playwright install chromium`.
+- In a development checkout, install Chromium with `python -m playwright install chromium`.
+- If a symbol fails, inspect the daily `archive/YYYY-MM-DD/` diagnostics.
+- If email fails, confirm the Gmail App Password is present in Keychain and the recipient config exists.
+- If running from a fresh GitHub install, the packaged default watchlist is used when `config/symbols.json` is absent.
+
+## Security and privacy
+
+Do not commit `config/email.local.json`, Gmail app passwords, `archive/`, or `data/`. Generated archives can include local diagnostics and market snapshots.
+
+## License
+
+MIT. See `LICENSE`.
