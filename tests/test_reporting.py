@@ -25,17 +25,17 @@ def _snapshot_for_layout(symbol: str, captured_at: datetime, monthly_signal: Sig
             ExpirationRow("06/26/26 (w)", date(2026, 6, 26), 24, 9104, 19646, 28750, 0.46, 84120, 156882, 241002, 0.54, 32.10, False),
         ]
         monthly_signals = [
-            MonthlySignal("2026-06", "06/18/26 (m)", 0.44, 0.90, 38716, 428918, monthly_signal),
+            MonthlySignal("2026-06", "06/18/26 (m)", 0.44, 0.90, 438716, 528918, monthly_signal),
             MonthlySignal("2026-07", "07/17/26 (m)", 0.61, 1.34, 1234567, 7654321, Signal.MIXED),
         ]
     else:
         metrics = TopMetrics("08/01/26", 22.45, 28.75, 18.25, 64.0)
         rows = [
-            ExpirationRow("07/17/26 (m)", date(2026, 7, 17), 45, 3333333, 4320988, 7654321, 1.72, 111111, 222222, 333333, 1.88, 44.44, True),
+            ExpirationRow("07/17/26 (m)", date(2026, 7, 17), 45, 3444444, 4555555, 7999999, 1.72, 611111, 722222, 1333333, 1.88, 44.44, True),
             ExpirationRow("07/24/26 (w)", date(2026, 7, 24), 52, 55555, 66666, 122221, 0.83, 77777, 88888, 166665, 0.88, 45.55, False),
         ]
         monthly_signals = [
-            MonthlySignal("2026-07", "07/17/26 (m)", 1.72, 1.88, 7654321, 333333, monthly_signal),
+            MonthlySignal("2026-07", "07/17/26 (m)", 1.72, 1.88, 8111111, 1444444, monthly_signal),
             MonthlySignal("2026-08", "08/21/26 (m)", 0.77, 1.11, 654321, 987654, Signal.MIXED_CAUTION),
         ]
     snapshot = Snapshot(
@@ -100,8 +100,17 @@ def _extract_summary_rows(summary_table: str) -> list[str]:
 
 def _row_containing(rows: list[str], value: str) -> str:
     matches = [row for row in rows if value in row]
-    assert len(matches) == 1, f"expected exactly one summary row containing {value!r}, found {len(matches)}"
+    assert len(matches) == 1, f"expected exactly one row containing {value!r}, found {len(matches)}"
     return matches[0]
+
+
+def _html_row_containing(block: str, value: str) -> str:
+    rows = re.findall(r"<tr\b[^>]*>.*?</tr>", block, flags=re.DOTALL)
+    return _row_containing(rows, value)
+
+
+def _assert_html_row_contains(block: str, row_marker: str, expected_values: list[str]) -> None:
+    _assert_contains_all(_html_row_containing(block, row_marker), expected_values)
 
 
 def _extract_symbol_detail_block(html: str, symbol: str) -> str:
@@ -122,6 +131,22 @@ def _assert_html_link(html: str, href: str, text: str) -> None:
         rf'<a\b[^>]*href="{re.escape(href)}"[^>]*>\s*{re.escape(text)}\s*</a>',
         html,
     ), f"missing link {text} -> {href}"
+
+
+def _extract_markdown_symbol_section(markdown: str, symbol: str) -> str:
+    match = re.search(rf"^## {re.escape(symbol)}\n(.*?)(?=^## |\Z)", markdown, flags=re.DOTALL | re.MULTILINE)
+    assert match, f"missing markdown section for {symbol}"
+    return match.group(0)
+
+
+def _markdown_line_containing(section: str, value: str) -> str:
+    matches = [line for line in section.splitlines() if value in line]
+    assert len(matches) == 1, f"expected exactly one markdown line containing {value!r}, found {len(matches)}"
+    return matches[0]
+
+
+def _assert_markdown_line_contains(section: str, line_marker: str, expected_values: list[str]) -> None:
+    _assert_contains_all(_markdown_line_containing(section, line_marker), expected_values)
 
 
 def _assert_contains_all(output: str, expected_values: list[str]) -> None:
@@ -176,6 +201,8 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
     _assert_contains_all(now_summary_row, ["NOW", "Success", "Bullish", "NOW-expirations.csv"])
     _assert_contains_all(meta_summary_row, ["META", "Success", "Bearish / hedging-heavy", "META-expirations.csv"])
     _assert_contains_all(err_summary_row, ["ERR", "Failed", "fetch timed out"])
+    _assert_html_link(now_summary_row, "NOW-expirations.csv", "NOW-expirations.csv")
+    _assert_html_link(meta_summary_row, "META-expirations.csv", "META-expirations.csv")
     assert "META" not in now_summary_row
     assert "NOW" not in meta_summary_row
     assert "expirations.csv" not in err_summary_row
@@ -194,12 +221,12 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
         ],
     )
     assert "ERR-expirations.csv" not in summary_table
-    _assert_html_link(html, "NOW-expirations.csv", "NOW-expirations.csv")
-    _assert_html_link(html, "META-expirations.csv", "META-expirations.csv")
     assert str(tmp_path) in html
 
     now_detail = _extract_symbol_detail_block(html, "NOW")
     meta_detail = _extract_symbol_detail_block(html, "META")
+    _assert_html_link(now_detail, "NOW-expirations.csv", "NOW-expirations.csv")
+    _assert_html_link(meta_detail, "META-expirations.csv", "META-expirations.csv")
     _assert_contains_all(
         now_detail,
         [
@@ -261,8 +288,10 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
             "META-expirations.csv",
         ],
     )
-    assert "38,716" in now_detail
-    assert "7,654,321" in meta_detail
+    assert "438,716" in _html_row_containing(now_detail, "2026-06")
+    assert "7,654,321" in _html_row_containing(now_detail, "2026-07")
+    assert "8,111,111" in _html_row_containing(meta_detail, "2026-07")
+    assert "1,333,333" in _html_row_containing(meta_detail, "44.44")
     assert "META drift summary" not in now_detail
     assert "NOW drift summary" not in meta_detail
 
@@ -321,9 +350,9 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
             "06/26/26 (w)",
             "07/17/26 (m)",
             "07/24/26 (w)",
-            "2026-06 | 06/18/26 (m) | 0.44 | 0.90 | 38,716 | 428,918 | Bullish |",
+            "2026-06 | 06/18/26 (m) | 0.44 | 0.90 | 438,716 | 528,918 | Bullish |",
             "2026-07 | 07/17/26 (m) | 0.61 | 1.34 | 1,234,567 | 7,654,321 | Mixed |",
-            "2026-07 | 07/17/26 (m) | 1.72 | 1.88 | 7,654,321 | 333,333 | Bearish / hedging-heavy |",
+            "2026-07 | 07/17/26 (m) | 1.72 | 1.88 | 8,111,111 | 1,444,444 | Bearish / hedging-heavy |",
             "2026-08 | 08/21/26 (m) | 0.77 | 1.11 | 654,321 | 987,654 | Mixed / caution |",
             "07/22/26",
             "30.86",
@@ -337,7 +366,7 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
             "64.0",
             "16 | 11,737 | 26,979 | 38,716 | 0.44",
             "24 | 9,104 | 19,646 | 28,750 | 0.46",
-            "45 | 3,333,333 | 4,320,988 | 7,654,321 | 1.72",
+            "45 | 3,444,444 | 4,555,555 | 7,999,999 | 1.72",
             "52 | 55,555 | 66,666 | 122,221 | 0.83",
             "31.92 | True",
             "32.1 | False",
@@ -355,41 +384,60 @@ def test_render_reports_comma_formats_large_human_facing_numbers(tmp_path: Path)
 
     html = bundle.html_path.read_text(encoding="utf-8")
     markdown = bundle.markdown_path.read_text(encoding="utf-8")
-    formatted_values = [
-        "11,737",
-        "26,979",
-        "202,821",
-        "226,097",
-        "9,104",
-        "19,646",
-        "28,750",
-        "84,120",
-        "156,882",
-        "241,002",
-        "38,716",
-        "428,918",
-        "1,234,567",
-        "7,654,321",
-        "3,333,333",
-        "4,320,988",
-        "111,111",
-        "222,222",
-        "333,333",
-        "55,555",
-        "66,666",
-        "122,221",
-        "77,777",
-        "88,888",
-        "166,665",
-        "654,321",
-        "987,654",
-    ]
-    unformatted_values = [value.replace(",", "") for value in formatted_values]
-    for output in (html, markdown):
-        for value in formatted_values:
-            assert value in output
-        for value in unformatted_values:
-            assert value not in output
+    now_detail = _extract_symbol_detail_block(html, "NOW")
+    meta_detail = _extract_symbol_detail_block(html, "META")
+
+    _assert_html_row_contains(now_detail, "2026-06", ["438,716", "528,918"])
+    _assert_html_row_contains(now_detail, "2026-07", ["1,234,567", "7,654,321"])
+    _assert_html_row_contains(
+        now_detail,
+        "31.92",
+        ["11,737", "26,979", "38,716", "202,821", "226,097", "428,918"],
+    )
+    _assert_html_row_contains(
+        now_detail,
+        "32.1",
+        ["9,104", "19,646", "28,750", "84,120", "156,882", "241,002"],
+    )
+    _assert_html_row_contains(meta_detail, "2026-07", ["8,111,111", "1,444,444"])
+    _assert_html_row_contains(meta_detail, "2026-08", ["654,321", "987,654"])
+    _assert_html_row_contains(
+        meta_detail,
+        "44.44",
+        ["3,444,444", "4,555,555", "7,999,999", "611,111", "722,222", "1,333,333"],
+    )
+    _assert_html_row_contains(
+        meta_detail,
+        "45.55",
+        ["55,555", "66,666", "122,221", "77,777", "88,888", "166,665"],
+    )
+
+    now_markdown = _extract_markdown_symbol_section(markdown, "NOW")
+    meta_markdown = _extract_markdown_symbol_section(markdown, "META")
+    _assert_markdown_line_contains(now_markdown, "2026-06 |", ["438,716", "528,918"])
+    _assert_markdown_line_contains(now_markdown, "2026-07 |", ["1,234,567", "7,654,321"])
+    _assert_markdown_line_contains(
+        now_markdown,
+        "31.92 | True",
+        ["11,737", "26,979", "38,716", "202,821", "226,097", "428,918"],
+    )
+    _assert_markdown_line_contains(
+        now_markdown,
+        "32.1 | False",
+        ["9,104", "19,646", "28,750", "84,120", "156,882", "241,002"],
+    )
+    _assert_markdown_line_contains(meta_markdown, "2026-07 |", ["8,111,111", "1,444,444"])
+    _assert_markdown_line_contains(meta_markdown, "2026-08 |", ["654,321", "987,654"])
+    _assert_markdown_line_contains(
+        meta_markdown,
+        "44.44 | True",
+        ["3,444,444", "4,555,555", "7,999,999", "611,111", "722,222", "1,333,333"],
+    )
+    _assert_markdown_line_contains(
+        meta_markdown,
+        "45.55 | False",
+        ["55,555", "66,666", "122,221", "77,777", "88,888", "166,665"],
+    )
 
 
 def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
