@@ -1,4 +1,5 @@
 import csv
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -14,6 +15,131 @@ from reporter.models import (
     TopMetrics,
 )
 from reporter.reporting import render_reports
+
+
+def _snapshot_for_layout(symbol: str, captured_at: datetime, monthly_signal: Signal, commentary: str) -> tuple[Snapshot, SymbolAnalysis]:
+    snapshot = Snapshot(
+        symbol=symbol,
+        url=f"https://www.barchart.com/stocks/quotes/{symbol.lower()}/put-call-ratios",
+        captured_at=captured_at,
+        metrics=TopMetrics("07/22/26", 30.86, 37.28, 29.62, 39.0),
+        rows=[
+            ExpirationRow("06/18/26 (m)", date(2026, 6, 18), 16, 11737, 26979, 38716, 0.44, 202821, 226097, 428918, 0.90, 31.92, True),
+            ExpirationRow("06/26/26 (w)", date(2026, 6, 26), 24, 9104, 19646, 28750, 0.46, 84120, 156882, 241002, 0.54, 32.10, False),
+        ],
+    )
+    analysis = SymbolAnalysis(
+        symbol=symbol,
+        captured_at=captured_at,
+        metrics=snapshot.metrics,
+        monthly_signals=[
+            MonthlySignal("2026-06", "06/18/26 (m)", 0.44, 0.90, 38716, 428918, monthly_signal),
+            MonthlySignal("2026-07", "07/17/26 (m)", 0.61, 1.34, 1234567, 7654321, Signal.MIXED),
+        ],
+        commentary=commentary,
+    )
+    return snapshot, analysis
+
+
+def _successful_symbol_report(symbol: str, monthly_signal: Signal, commentary: str) -> SymbolReport:
+    captured_at = datetime(2026, 6, 2, 21, 30)
+    snapshot, analysis = _snapshot_for_layout(symbol, captured_at, monthly_signal, commentary)
+    return SymbolReport(
+        symbol=symbol,
+        snapshot=snapshot,
+        analysis=analysis,
+        drift=[
+            DriftItem(
+                "previous_day",
+                f"{symbol} drift summary: volume cooled while open interest stayed elevated.",
+                signal_flips=["2026-07: Bullish -> Mixed / caution"],
+            )
+        ],
+    )
+
+
+def _assert_has_class(html: str, class_name: str) -> None:
+    assert re.search(rf'class="[^"]*\b{re.escape(class_name)}\b[^"]*"', html), f"missing class {class_name}"
+
+
+def _layout_bundle(tmp_path: Path) -> ReportBundle:
+    return render_reports(
+        generated_at=datetime(2026, 6, 2, 21, 35),
+        symbol_reports=[
+            _successful_symbol_report("NOW", Signal.BULLISH, "NOW: bullish call demand remains constructive."),
+            _successful_symbol_report("META", Signal.BEARISH_HEDGING, "META: bearish hedging remains elevated."),
+            SymbolReport(
+                symbol="ERR",
+                snapshot=None,
+                analysis=None,
+                drift=[],
+                error="fetch timed out",
+            ),
+        ],
+        archive_dir=tmp_path,
+    )
+
+
+def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: Path) -> None:
+    bundle = _layout_bundle(tmp_path)
+
+    html = bundle.html_path.read_text(encoding="utf-8")
+    assert "<style" in html
+    _assert_has_class(html, "report-shell")
+    _assert_has_class(html, "summary-table")
+    _assert_has_class(html, "symbol-card")
+    _assert_has_class(html, "kpi-grid")
+    _assert_has_class(html, "kpi-card")
+    _assert_has_class(html, "signal-badge")
+    _assert_has_class(html, "signal-badge--bullish")
+    _assert_has_class(html, "signal-badge--mixed")
+    _assert_has_class(html, "signal-badge--bearish")
+    _assert_has_class(html, "signal-badge--failed")
+    _assert_has_class(html, "drift-table")
+    _assert_has_class(html, "raw-data-panel")
+    _assert_has_class(html, "raw-options-table")
+    assert len(re.findall(r'class="[^"]*\bsymbol-card\b[^"]*"', html)) >= 2
+    assert "NOW-expirations.csv" in html
+    assert "META-expirations.csv" in html
+    assert str(tmp_path) in html
+
+    for expected in [
+        "NOW",
+        "META",
+        "ERR",
+        "NOW: bullish call demand remains constructive.",
+        "META: bearish hedging remains elevated.",
+        "07/22/26",
+        "30.86",
+        "37.28",
+        "2026-06",
+        "2026-07",
+        "Bullish",
+        "Mixed",
+        "Bearish / hedging-heavy",
+        "06/18/26 (m)",
+        "06/26/26 (w)",
+        "previous_day",
+        "NOW drift summary: volume cooled while open interest stayed elevated.",
+        "META drift summary: volume cooled while open interest stayed elevated.",
+        "2026-07: Bullish -&gt; Mixed / caution",
+        "fetch timed out",
+    ]:
+        assert expected in html
+
+
+def test_render_reports_comma_formats_large_human_facing_numbers(tmp_path: Path) -> None:
+    bundle = _layout_bundle(tmp_path)
+
+    html = bundle.html_path.read_text(encoding="utf-8")
+    markdown = bundle.markdown_path.read_text(encoding="utf-8")
+    for output in (html, markdown):
+        assert "1,234,567" in output
+        assert "428,918" in output
+        assert "38,716" in output
+        assert "1234567" not in output
+        assert "428918" not in output
+        assert "38716" not in output
 
 
 def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
