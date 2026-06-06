@@ -30,6 +30,27 @@ source .venv/bin/activate
 options-put-call-report run --no-email
 ```
 
+Run a one-off report for symbols entered in the terminal:
+
+```bash
+options-put-call-report run --no-email META MSFT NOW
+```
+
+Run a one-off report from a plain text symbol file:
+
+```bash
+options-put-call-report run --no-email --symbols-file watchlist.txt
+```
+
+The symbol file can use one symbol per line, spaces, commas, and `#` comments:
+
+```text
+# watchlist.txt
+META, MSFT
+NOW AAOI
+LITE  # comments are ignored
+```
+
 Collect, analyze, archive, and send email:
 
 ```bash

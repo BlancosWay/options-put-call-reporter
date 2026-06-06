@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -10,6 +11,9 @@ from reporter.models import AppConfig, SymbolConfig, Thresholds
 
 class ConfigError(ValueError):
     pass
+
+
+SYMBOL_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9.-]*$")
 
 
 def _require_string(data: dict[str, Any], key: str) -> str:
@@ -56,6 +60,40 @@ def _is_barchart_put_call_url(url: str, symbol: str) -> bool:
         return False
     expected_path = f"/stocks/quotes/{symbol.lower()}/put-call-ratios"
     return parsed.path.rstrip("/").lower() == expected_path
+
+
+def _symbol_url(symbol: str) -> str:
+    return f"https://www.barchart.com/stocks/quotes/{symbol.lower()}/put-call-ratios"
+
+
+def parse_symbol_tokens(values: list[str]) -> list[str]:
+    symbols: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        body = value.split("#", 1)[0]
+        for raw_token in re.split(r"[\s,]+", body):
+            token = raw_token.strip().upper()
+            if not token:
+                continue
+            if not SYMBOL_PATTERN.fullmatch(token):
+                raise ConfigError(f"Invalid symbol '{raw_token.strip()}'")
+            if token in seen:
+                raise ConfigError(f"Duplicate symbol '{token}'")
+            seen.add(token)
+            symbols.append(token)
+    if not symbols:
+        raise ConfigError("At least one symbol is required")
+    return symbols
+
+
+def load_symbol_file(path: str | Path) -> list[str]:
+    symbol_path = Path(path)
+    return parse_symbol_tokens(symbol_path.read_text(encoding="utf-8").splitlines())
+
+
+def symbols_from_names(names: list[str]) -> list[SymbolConfig]:
+    symbols = parse_symbol_tokens(names)
+    return [SymbolConfig(symbol=symbol, url=_symbol_url(symbol)) for symbol in symbols]
 
 
 def _symbols(data: dict[str, Any]) -> list[SymbolConfig]:

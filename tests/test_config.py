@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from reporter import config
 from reporter.config import ConfigError, load_config
 
 
@@ -209,3 +210,49 @@ def test_load_config_rejects_float_min_total_volume_for_commentary(tmp_path: Pat
 
     with pytest.raises(ConfigError, match="integer"):
         load_config(config_path)
+
+
+def test_parse_symbol_tokens_accepts_spaces_commas_case_and_comments() -> None:
+    assert config.parse_symbol_tokens(["meta", "MSFT, now", "# comment", "AAOI # comment", "lite goog"]) == [
+        "META",
+        "MSFT",
+        "NOW",
+        "AAOI",
+        "LITE",
+        "GOOG",
+    ]
+
+
+def test_parse_symbol_tokens_rejects_duplicates_after_uppercase() -> None:
+    with pytest.raises(ConfigError, match="Duplicate symbol 'NOW'"):
+        config.parse_symbol_tokens(["now", "MSFT", "NOW"])
+
+
+def test_parse_symbol_tokens_rejects_invalid_symbols() -> None:
+    with pytest.raises(ConfigError, match="Invalid symbol"):
+        config.parse_symbol_tokens(["META", "BAD/SYMBOL"])
+
+
+def test_load_symbol_file_accepts_plain_text_symbols_commas_spaces_and_comments(tmp_path: Path) -> None:
+    path = tmp_path / "watchlist.txt"
+    path.write_text(
+        """
+        # mega-cap watchlist
+        meta, msft
+        now aaoi # growth names
+
+        lite
+        """,
+        encoding="utf-8",
+    )
+
+    assert config.load_symbol_file(path) == ["META", "MSFT", "NOW", "AAOI", "LITE"]
+
+
+def test_symbols_from_names_builds_standard_barchart_urls() -> None:
+    symbols = config.symbols_from_names(["META", "BRK.B"])
+
+    assert symbols[0].symbol == "META"
+    assert symbols[0].url == "https://www.barchart.com/stocks/quotes/meta/put-call-ratios"
+    assert symbols[1].symbol == "BRK.B"
+    assert symbols[1].url == "https://www.barchart.com/stocks/quotes/brk.b/put-call-ratios"

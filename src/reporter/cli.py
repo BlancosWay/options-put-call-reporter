@@ -10,7 +10,7 @@ from pathlib import Path
 
 from reporter.analyzer import analyze_snapshot
 from reporter.collector import collect_symbol
-from reporter.config import load_config
+from reporter.config import ConfigError, load_config, load_symbol_file, symbols_from_names
 from reporter.drift import build_drift
 from reporter.emailer import send_email_report
 from reporter.history import HistoryStore
@@ -35,14 +35,23 @@ def _write_email_config(path: Path, email_config: EmailConfig) -> None:
     )
 
 
+def _run_symbols(args: argparse.Namespace, default_symbols):
+    if args.symbols_file:
+        return symbols_from_names(load_symbol_file(args.symbols_file))
+    if args.symbols:
+        return symbols_from_names(args.symbols)
+    return default_symbols
+
+
 async def _run_async(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    run_symbols = _run_symbols(args, config.symbols)
     captured_at = datetime.fromisoformat(args.run_date) if args.run_date else datetime.now()
     run_archive = config.archive_dir / captured_at.strftime("%Y-%m-%d")
     store = HistoryStore(config.database_path)
     symbol_reports: list[SymbolReport] = []
 
-    for symbol_config in config.symbols:
+    for symbol_config in run_symbols:
         try:
             snapshot = await collect_symbol(symbol_config, captured_at, run_archive)
             store.save_snapshot(snapshot)
@@ -112,9 +121,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--config", type=Path, default=Path("config/symbols.json"))
     run.add_argument("--email-config", type=Path, default=Path("config/email.local.json"))
     run.add_argument("--run-date", default=None)
+    run.add_argument("--symbols-file", type=Path, default=None)
     email_group = run.add_mutually_exclusive_group()
     email_group.add_argument("--send-email", action="store_true")
     email_group.add_argument("--no-email", action="store_true")
+    run.add_argument("symbols", nargs="*")
 
     setup = subparsers.add_parser("setup-email")
     setup.add_argument("--config", type=Path, default=Path("config/symbols.json"))
@@ -128,9 +139,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "setup-email":
         return _setup_email(args)
     if args.command == "run":
+        if args.symbols_file and args.symbols:
+            print("Use either positional symbols or --symbols-file, not both", file=sys.stderr)
+            return 2
         if not args.send_email and not args.no_email:
             args.no_email = True
-        return asyncio.run(_run_async(args))
+        try:
+            return asyncio.run(_run_async(args))
+        except ConfigError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     parser.error(f"Unsupported command {args.command}")
     return 2
 

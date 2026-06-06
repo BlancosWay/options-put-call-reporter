@@ -87,6 +87,108 @@ def test_run_no_email_creates_report_and_saves_history(monkeypatch, tmp_path: Pa
     assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("NOW") is not None
 
 
+def test_run_positional_symbols_override_config_symbols(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path, symbols=["NOW"])
+    collected: list[SymbolConfig] = []
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        collected.append(symbol_config)
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    exit_code = main([
+        "run",
+        "--config",
+        str(config_path),
+        "--no-email",
+        "--run-date",
+        "2026-06-02T21:30:00",
+        "meta",
+        "MSFT",
+        "brk.b",
+    ])
+
+    assert exit_code == 0
+    assert [symbol.symbol for symbol in collected] == ["META", "MSFT", "BRK.B"]
+    assert [symbol.url for symbol in collected] == [
+        "https://www.barchart.com/stocks/quotes/meta/put-call-ratios",
+        "https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+        "https://www.barchart.com/stocks/quotes/brk.b/put-call-ratios",
+    ]
+    assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("NOW") is None
+    assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("META") is not None
+
+
+def test_run_symbols_file_overrides_config_symbols(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    symbols_file = tmp_path / "watchlist.txt"
+    _config(config_path, symbols=["NOW"])
+    symbols_file.write_text("meta, msft\n# comment\nlite aaoi\n", encoding="utf-8")
+    collected: list[str] = []
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        collected.append(symbol_config.symbol)
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    exit_code = main([
+        "run",
+        "--config",
+        str(config_path),
+        "--symbols-file",
+        str(symbols_file),
+        "--no-email",
+        "--run-date",
+        "2026-06-02T21:30:00",
+    ])
+
+    assert exit_code == 0
+    assert collected == ["META", "MSFT", "LITE", "AAOI"]
+    assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("NOW") is None
+    assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("LITE") is not None
+
+
+def test_run_without_symbol_override_uses_config_symbols(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path, symbols=["NOW", "MSFT"])
+    collected: list[str] = []
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        collected.append(symbol_config.symbol)
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    exit_code = main(["run", "--config", str(config_path), "--no-email", "--run-date", "2026-06-02T21:30:00"])
+
+    assert exit_code == 0
+    assert collected == ["NOW", "MSFT"]
+
+
+def test_run_rejects_symbols_file_combined_with_positional_symbols(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    symbols_file = tmp_path / "watchlist.txt"
+    _config(config_path)
+    symbols_file.write_text("META\n", encoding="utf-8")
+
+    exit_code = main([
+        "run",
+        "--config",
+        str(config_path),
+        "--symbols-file",
+        str(symbols_file),
+        "--no-email",
+        "MSFT",
+    ])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Use either positional symbols or --symbols-file, not both" in captured.err
+
+
 def test_run_reports_partial_failures_without_stopping(monkeypatch, tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     _config(config_path, symbols=["NOW", "MSFT"])
