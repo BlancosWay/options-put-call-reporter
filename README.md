@@ -7,7 +7,9 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 ## Features
 
 - Collects Barchart put/call ratio data with Playwright Chromium.
+- Falls back to yfin.dev options-chain data when Barchart collection fails.
 - Produces a clean HTML dashboard plus Markdown and CSV outputs.
+- Reports disclose the data source used for each symbol.
 - Tracks history in SQLite and reports day/week/month drift where prior data exists.
 - Supports default symbols, terminal symbols, or a plain-text symbol file.
 - Sends Gmail reports using a macOS Keychain-stored app password.
@@ -77,6 +79,7 @@ By default, reports and raw collection artifacts are written under `archive/YYYY
 - `{SYMBOL}-expirations.csv` - raw expiration table.
 - `{SYMBOL}-snapshot.json` - normalized snapshot.
 - `{SYMBOL}-raw.json` and `{SYMBOL}-raw.html` - collection diagnostics.
+- `{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.
 
 History is stored in `data/history.sqlite3`.
 

@@ -21,6 +21,11 @@ def analysis(symbol: str, month_signal: Signal, vol_ratio: float, oi_ratio: floa
     )
 
 
+def assert_no_nonfinite_numeric_delta(summary: str) -> None:
+    forbidden = ("nan", "+nan", "inf", "+inf", "-inf")
+    assert not any(token in summary.lower() for token in forbidden)
+
+
 def test_build_drift_reports_missing_prior() -> None:
     current = analysis("MSFT", Signal.BULLISH, 0.50, 0.80)
 
@@ -77,3 +82,36 @@ def test_build_drift_reports_no_prior_monthly_signals() -> None:
     assert drift[0].period == "previous_day"
     assert "No prior monthly signals" in drift[0].summary
     assert drift[0].signal_flips == []
+
+
+def test_build_drift_reports_infinite_ratios_remained_extremely_put_heavy() -> None:
+    current = analysis("MSFT", Signal.BEARISH_HEDGING, float("inf"), float("inf"))
+    previous = analysis("MSFT", Signal.BEARISH_HEDGING, float("inf"), float("inf"))
+
+    drift = build_drift(current, {"previous_day": previous}, thresholds())
+
+    assert "average put/call volume ratio remained extremely put-heavy" in drift[0].summary
+    assert "average put/call open-interest ratio remained extremely put-heavy" in drift[0].summary
+    assert_no_nonfinite_numeric_delta(drift[0].summary)
+
+
+def test_build_drift_reports_ratios_moved_to_extremely_put_heavy() -> None:
+    current = analysis("MSFT", Signal.BEARISH_HEDGING, float("inf"), float("inf"))
+    previous = analysis("MSFT", Signal.BULLISH, 0.50, 0.80)
+
+    drift = build_drift(current, {"previous_day": previous}, thresholds())
+
+    assert "average put/call volume ratio moved to an extremely put-heavy reading" in drift[0].summary
+    assert "average put/call open-interest ratio moved to an extremely put-heavy reading" in drift[0].summary
+    assert_no_nonfinite_numeric_delta(drift[0].summary)
+
+
+def test_build_drift_reports_ratios_moved_back_from_extremely_put_heavy() -> None:
+    current = analysis("MSFT", Signal.BULLISH, 0.50, 0.80)
+    previous = analysis("MSFT", Signal.BEARISH_HEDGING, float("inf"), float("inf"))
+
+    drift = build_drift(current, {"previous_day": previous}, thresholds())
+
+    assert "average put/call volume ratio moved back from an extremely put-heavy reading" in drift[0].summary
+    assert "average put/call open-interest ratio moved back from an extremely put-heavy reading" in drift[0].summary
+    assert_no_nonfinite_numeric_delta(drift[0].summary)
