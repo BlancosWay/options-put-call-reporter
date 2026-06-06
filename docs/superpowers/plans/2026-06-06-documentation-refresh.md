@@ -691,7 +691,7 @@ git --no-pager diff -- README.md docs/ARCHITECTURE.md docs/MAINTENANCE.md docs/P
 
 Expected: only documentation and publication-asset tests changed.
 
-- [ ] **Step 3: Commit the docs refresh**
+- [x] **Step 3: Commit the docs refresh**
 
 Run:
 
