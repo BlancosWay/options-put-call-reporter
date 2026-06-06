@@ -139,6 +139,19 @@ def _extract_markdown_symbol_section(markdown: str, symbol: str) -> str:
     return match.group(0)
 
 
+def _extract_markdown_failures_section(markdown: str) -> str:
+    match = re.search(r"^## Failures\n(.*?)(?=^## |\Z)", markdown, flags=re.DOTALL | re.MULTILINE)
+    assert match, "missing markdown failures section"
+    return match.group(0)
+
+
+def _extract_markdown_failure_detail_section(markdown: str, symbol: str) -> str:
+    symbol_heading = re.search(rf"^## {re.escape(symbol)}\n", markdown, flags=re.MULTILINE)
+    if symbol_heading:
+        return _extract_markdown_symbol_section(markdown, symbol)
+    return _extract_markdown_failures_section(markdown)
+
+
 def _markdown_line_containing(section: str, value: str) -> str:
     matches = [line for line in section.splitlines() if value in line]
     assert len(matches) == 1, f"expected exactly one markdown line containing {value!r}, found {len(matches)}"
@@ -233,6 +246,7 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
             "NOW: bullish call demand remains constructive.",
             "07/22/26",
             "30.86",
+            "37.28",
             "29.62",
             "39.0",
             "2026-06",
@@ -332,6 +346,63 @@ def test_render_reports_adds_dashboard_layout_without_losing_details(tmp_path: P
             "fetch timed out",
         ],
     )
+
+    now_markdown = _extract_markdown_symbol_section(markdown, "NOW")
+    meta_markdown = _extract_markdown_symbol_section(markdown, "META")
+    err_markdown = _extract_markdown_failure_detail_section(markdown, "ERR")
+    _assert_contains_all(
+        now_markdown,
+        [
+            "## NOW",
+            "NOW: bullish call demand remains constructive.",
+            "07/22/26",
+            "30.86",
+            "37.28",
+            "29.62",
+            "39.0",
+            "2026-06 | 06/18/26 (m) | 0.44 | 0.90 | 438,716 | 528,918 | Bullish |",
+            "2026-07 | 07/17/26 (m) | 0.61 | 1.34 | 1,234,567 | 7,654,321 | Mixed |",
+            "- **previous_day**: NOW drift summary: front-month call demand cooled while July open interest stayed elevated. Signal flips: 2026-07: Bullish -> Mixed / caution",
+            "2026-07: Bullish -> Mixed / caution",
+            "06/18/26 (m)",
+            "06/26/26 (w)",
+            "16 | 11,737 | 26,979 | 38,716 | 0.44",
+            "24 | 9,104 | 19,646 | 28,750 | 0.46",
+            "31.92 | True",
+            "32.1 | False",
+            "NOW-expirations.csv",
+        ],
+    )
+    _assert_contains_all(
+        meta_markdown,
+        [
+            "## META",
+            "META: bearish hedging remains elevated.",
+            "08/01/26",
+            "22.45",
+            "28.75",
+            "18.25",
+            "64.0",
+            "2026-07 | 07/17/26 (m) | 1.72 | 1.88 | 8,111,111 | 1,444,444 | Bearish / hedging-heavy |",
+            "2026-08 | 08/21/26 (m) | 0.77 | 1.11 | 654,321 | 987,654 | Mixed / caution |",
+            "Bearish / hedging-heavy",
+            "- **previous_day**: META drift summary: bearish monthly hedging accelerated as total volume spiked. Signal flips: 2026-07: Neutral -> Bearish / hedging-heavy",
+            "2026-07: Neutral -> Bearish / hedging-heavy",
+            "07/17/26 (m)",
+            "07/24/26 (w)",
+            "45 | 3,444,444 | 4,555,555 | 7,999,999 | 1.72",
+            "52 | 55,555 | 66,666 | 122,221 | 0.83",
+            "44.44 | True",
+            "45.55 | False",
+            "META-expirations.csv",
+        ],
+    )
+    _assert_contains_all(err_markdown, ["ERR", "fetch timed out"])
+    assert "META drift summary" not in now_markdown
+    assert "META-expirations.csv" not in now_markdown
+    assert "NOW drift summary" not in meta_markdown
+    assert "NOW-expirations.csv" not in meta_markdown
+
     _assert_contains_all(
         markdown,
         [
