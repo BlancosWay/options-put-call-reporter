@@ -19,7 +19,7 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 ```bash
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
-python3 -m pipx install git+https://github.com/srinadel/options-put-call-reporter.git
+python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
 python3 -m pipx run --spec playwright playwright install chromium
 ```
 
@@ -28,7 +28,7 @@ After `ensurepath`, restart your shell or source your shell profile before runni
 For development:
 
 ```bash
-git clone https://github.com/srinadel/options-put-call-reporter.git
+git clone https://github.com/BlancosWay/options-put-call-reporter.git
 cd options-put-call-reporter
 python3 -m venv .venv
 source .venv/bin/activate

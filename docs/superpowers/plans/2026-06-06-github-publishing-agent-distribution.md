@@ -73,8 +73,8 @@ def test_pyproject_has_public_github_metadata() -> None:
     assert project["license"] == {"file": "LICENSE"}
     assert "Development Status :: 4 - Beta" in project["classifiers"]
     assert "Topic :: Office/Business :: Financial" in project["classifiers"]
-    assert project["urls"]["Repository"] == "https://github.com/srinadel/options-put-call-reporter"
-    assert project["urls"]["Issues"] == "https://github.com/srinadel/options-put-call-reporter/issues"
+    assert project["urls"]["Repository"] == "https://github.com/BlancosWay/options-put-call-reporter"
+    assert project["urls"]["Issues"] == "https://github.com/BlancosWay/options-put-call-reporter/issues"
     assert "build>=1,<2" in data["project"]["optional-dependencies"]["dev"]
 
 
@@ -193,10 +193,10 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
-  { name = "Sri", email = "srinadel@users.noreply.github.com" }
+  { name = "Sri", email = "BlancosWay@users.noreply.github.com" }
 ]
 maintainers = [
-  { name = "Sri", email = "srinadel@users.noreply.github.com" }
+  { name = "Sri", email = "BlancosWay@users.noreply.github.com" }
 ]
 keywords = ["options", "put-call-ratio", "barchart", "sentiment", "reporting", "playwright"]
 classifiers = [
@@ -222,9 +222,9 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/srinadel/options-put-call-reporter"
-Issues = "https://github.com/srinadel/options-put-call-reporter/issues"
-Documentation = "https://github.com/srinadel/options-put-call-reporter#readme"
+Repository = "https://github.com/BlancosWay/options-put-call-reporter"
+Issues = "https://github.com/BlancosWay/options-put-call-reporter/issues"
+Documentation = "https://github.com/BlancosWay/options-put-call-reporter#readme"
 
 [project.scripts]
 options-put-call-report = "reporter.cli:main"
@@ -296,7 +296,7 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
 
     readme = _read("README.md")
     for text in [
-        "pipx install git+https://github.com/srinadel/options-put-call-reporter.git",
+        "pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git",
         "pipx run --spec playwright playwright install chromium",
         "python -m playwright install chromium",
         "options-put-call-report run --no-email",
@@ -422,14 +422,14 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 ```bash
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
-pipx install git+https://github.com/srinadel/options-put-call-reporter.git
+pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
 pipx run --spec playwright playwright install chromium
 ```
 
 For development:
 
 ```bash
-git clone https://github.com/srinadel/options-put-call-reporter.git
+git clone https://github.com/BlancosWay/options-put-call-reporter.git
 cd options-put-call-reporter
 python3 -m venv .venv
 source .venv/bin/activate
@@ -616,12 +616,12 @@ Create `docs/PUBLISHING.md`:
 ```markdown
 # Publishing to GitHub
 
-Target repository: `https://github.com/srinadel/options-put-call-reporter`
+Target repository: `https://github.com/BlancosWay/options-put-call-reporter`
 
 ## Create the public repository with GitHub CLI
 
 ```bash
-gh repo create srinadel/options-put-call-reporter --public --source=. --remote=origin --push
+gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push
 ```
 
 ## Manual fallback
@@ -629,7 +629,7 @@ gh repo create srinadel/options-put-call-reporter --public --source=. --remote=o
 If GitHub CLI is unavailable:
 
 ```bash
-git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
+git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
 git push -u origin feature/daily-options-report
 ```
 
@@ -1220,13 +1220,13 @@ Expected: if `gh` exists and is authenticated, continue to Step 6. If not, skip 
 Run:
 
 ```bash
-gh repo create srinadel/options-put-call-reporter --public --source=. --remote=origin --push
+gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push
 ```
 
 If the repository already exists, run:
 
 ```bash
-git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
+git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
 git push -u origin feature/daily-options-report
 ```
 
@@ -1238,11 +1238,11 @@ Report these exact commands:
 
 ```bash
 cd /Users/sri/personal/options-put-call-reporter/.worktrees/daily-options-report
-git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
+git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
 git push -u origin feature/daily-options-report
 ```
 
-Also state: create a public GitHub repository named `options-put-call-reporter` under `srinadel` before running them if it does not already exist.
+Also state: create a public GitHub repository named `options-put-call-reporter` under `BlancosWay` before running them if it does not already exist.
 
 - [ ] **Step 8: Record final status**
 

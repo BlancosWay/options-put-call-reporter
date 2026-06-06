@@ -2,11 +2,11 @@
 
 ## Goal
 
-Publish `options-put-call-reporter` as a production-ready public GitHub project under `srinadel/options-put-call-reporter`, usable as a Python CLI tool and as an assistant-ready workflow package for Claude Code, GitHub Copilot, Codex, and Gemini.
+Publish `options-put-call-reporter` as a production-ready public GitHub project under `BlancosWay/options-put-call-reporter`, usable as a Python CLI tool and as an assistant-ready workflow package for Claude Code, GitHub Copilot, Codex, and Gemini.
 
 ## Scope
 
-This release is GitHub-first. It will prepare and publish a public repository, but it will not publish to PyPI in this iteration. The CLI install path will be from GitHub, such as `pipx install git+https://github.com/srinadel/options-put-call-reporter.git`.
+This release is GitHub-first. It will prepare and publish a public repository, but it will not publish to PyPI in this iteration. The CLI install path will be from GitHub, such as `pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git`.
 
 The assistant distribution will be marketplace-style and portable: platform-native instruction files in the repository plus a reusable `assistant-pack/` directory that can be copied into assistant ecosystems. If official marketplace publication requires accounts, APIs, or tools unavailable in the local environment, the repository will include exact publishing instructions and remain ready for manual submission.
 
@@ -21,7 +21,7 @@ The project will keep the existing Python package layout:
 
 Production metadata will be added or expanded:
 
-- `pyproject.toml` will include README, MIT license metadata, keywords, classifiers, project URLs, and author/maintainer information for `@srinadel`.
+- `pyproject.toml` will include README, MIT license metadata, keywords, classifiers, project URLs, and author/maintainer information for `@BlancosWay`.
 - `LICENSE` will use the MIT license with copyright attribution to Sri.
 - `.gitignore` will continue excluding local runtime files and will also cover build artifacts, coverage files, environment files, and common tool caches.
 - README will become the public landing page with features, install, quickstart, custom symbols, email setup, scheduler setup, generated outputs, troubleshooting, security/privacy notes, and a financial-disclaimer section.
@@ -95,7 +95,7 @@ The implementation will attempt to publish to GitHub only through authenticated 
 
 1. Confirm the worktree is clean after implementation.
 2. Verify tests pass.
-3. Create or connect the public GitHub repository `srinadel/options-put-call-reporter`.
+3. Create or connect the public GitHub repository `BlancosWay/options-put-call-reporter`.
 4. Add `origin` if missing.
 5. Push the publication branch.
 

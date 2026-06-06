@@ -1,17 +1,17 @@
 # Publishing to GitHub
 
-Target repository: `https://github.com/srinadel/options-put-call-reporter`
+Target repository: `https://github.com/BlancosWay/options-put-call-reporter`
 
 ## Create the public repository with GitHub CLI
 
 ```bash
-gh repo create srinadel/options-put-call-reporter --public
+gh repo create BlancosWay/options-put-call-reporter --public
 ```
 
 Then set or update `origin` and push the current branch:
 
 ```bash
-git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
+git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
 git push -u origin HEAD
 ```
 
@@ -19,10 +19,10 @@ git push -u origin HEAD
 
 If GitHub CLI is unavailable:
 
-Create an empty public GitHub repository named `srinadel/options-put-call-reporter` before running the fallback commands.
+Create an empty public GitHub repository named `BlancosWay/options-put-call-reporter` before running the fallback commands.
 
 ```bash
-git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git
+git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
 git push -u origin HEAD
 ```
 

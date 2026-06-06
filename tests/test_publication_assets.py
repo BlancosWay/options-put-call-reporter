@@ -22,8 +22,10 @@ def test_pyproject_has_public_github_metadata() -> None:
     assert "Development Status :: 4 - Beta" in project["classifiers"]
     assert "License :: OSI Approved :: MIT License" not in project["classifiers"]
     assert "Topic :: Office/Business :: Financial" in project["classifiers"]
-    assert project["urls"]["Repository"] == "https://github.com/srinadel/options-put-call-reporter"
-    assert project["urls"]["Issues"] == "https://github.com/srinadel/options-put-call-reporter/issues"
+    assert project["authors"] == [{"name": "Sri", "email": "BlancosWay@users.noreply.github.com"}]
+    assert project["maintainers"] == [{"name": "Sri", "email": "BlancosWay@users.noreply.github.com"}]
+    assert project["urls"]["Repository"] == "https://github.com/BlancosWay/options-put-call-reporter"
+    assert project["urls"]["Issues"] == "https://github.com/BlancosWay/options-put-call-reporter/issues"
     assert "build>=1,<2" in data["project"]["optional-dependencies"]["dev"]
     assert "setuptools>=77.0.3" in data["build-system"]["requires"]
 
@@ -50,7 +52,7 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
 
     readme = _read("README.md")
     for text in [
-        "python3 -m pipx install git+https://github.com/srinadel/options-put-call-reporter.git",
+        "python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git",
         "python3 -m pipx run --spec playwright playwright install chromium",
         "python -m playwright install chromium",
         "options-put-call-report run --no-email",
@@ -82,10 +84,26 @@ def test_public_docs_describe_existing_assistant_assets() -> None:
 def test_publishing_docs_include_existing_origin_safe_commands() -> None:
     publishing = _read("docs/PUBLISHING.md")
 
-    assert "Create an empty public GitHub repository named `srinadel/options-put-call-reporter` before running the fallback commands." in publishing
-    assert "git remote add origin https://github.com/srinadel/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/srinadel/options-put-call-reporter.git" in publishing
+    assert "Create an empty public GitHub repository named `BlancosWay/options-put-call-reporter` before running the fallback commands." in publishing
+    assert "git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git" in publishing
     assert "git push -u origin HEAD" in publishing
-    assert "gh repo create srinadel/options-put-call-reporter --public --source=. --remote=origin --push" not in publishing
+    assert "gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push" not in publishing
+
+
+def test_publication_assets_target_blancosway_not_prior_owner() -> None:
+    old_owner = "srina" + "del"
+    publication_paths = [
+        "pyproject.toml",
+        "README.md",
+        "docs/PUBLISHING.md",
+        "docs/superpowers/specs/2026-06-05-github-publishing-agent-distribution-design.md",
+        "docs/superpowers/plans/2026-06-06-github-publishing-agent-distribution.md",
+    ]
+
+    for path in publication_paths:
+        content = _read(path)
+        assert old_owner not in content
+        assert "BlancosWay/options-put-call-reporter" in content or "BlancosWay@users.noreply.github.com" in content
 
 
 def test_gitignore_covers_public_repo_runtime_and_build_artifacts() -> None:

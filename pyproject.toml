@@ -11,10 +11,10 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [
-  { name = "Sri", email = "srinadel@users.noreply.github.com" }
+  { name = "Sri", email = "BlancosWay@users.noreply.github.com" }
 ]
 maintainers = [
-  { name = "Sri", email = "srinadel@users.noreply.github.com" }
+  { name = "Sri", email = "BlancosWay@users.noreply.github.com" }
 ]
 keywords = ["options", "put-call-ratio", "barchart", "sentiment", "reporting", "playwright"]
 classifiers = [
@@ -39,9 +39,9 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/srinadel/options-put-call-reporter"
-Issues = "https://github.com/srinadel/options-put-call-reporter/issues"
-Documentation = "https://github.com/srinadel/options-put-call-reporter#readme"
+Repository = "https://github.com/BlancosWay/options-put-call-reporter"
+Issues = "https://github.com/BlancosWay/options-put-call-reporter/issues"
+Documentation = "https://github.com/BlancosWay/options-put-call-reporter#readme"
 
 [project.scripts]
 options-put-call-report = "reporter.cli:main"
