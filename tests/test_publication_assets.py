@@ -217,7 +217,7 @@ def test_dependabot_auto_merge_only_allows_patch_and_minor_updates() -> None:
 
     for text in [
         "pull_request_target:",
-        "github.actor == 'dependabot[bot]'",
+        "github.event.pull_request.user.login == 'dependabot[bot]'",
         "!github.event.pull_request.draft",
         "contents: write",
         "pull-requests: write",
@@ -228,4 +228,5 @@ def test_dependabot_auto_merge_only_allows_patch_and_minor_updates() -> None:
     ]:
         assert text in workflow
 
+    assert "github.actor == 'dependabot[bot]'" not in workflow
     assert "version-update:semver-major" not in workflow
