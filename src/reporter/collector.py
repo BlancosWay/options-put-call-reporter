@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import urllib.parse
+import urllib.request
 from contextlib import suppress
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 from playwright.async_api import async_playwright
 
-from reporter.models import ExpirationRow, Snapshot, SymbolConfig, TopMetrics
+from reporter.models import DataSource, ExpirationRow, Snapshot, SymbolConfig, TopMetrics
 from reporter.parsing import ParseError, parse_expiration_label, parse_float, parse_int, parse_percent
 
 
@@ -36,14 +39,36 @@ class CollectionError(RuntimeError):
     pass
 
 
+YFIN_OPTIONS_URL = "https://api.yfin.dev/v1/options"
+
+
 async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, archive_dir: Path) -> Snapshot:
+    try:
+        return await _collect_symbol_from_barchart(symbol_config, captured_at, archive_dir)
+    except CollectionError as primary_exc:
+        try:
+            return await _collect_symbol_from_yfin(symbol_config, captured_at, archive_dir, primary_exc)
+        except Exception as fallback_exc:
+            raise CollectionError(
+                f"{symbol_config.symbol} collection failed. "
+                f"Barchart failed: {_short_error(primary_exc)}; "
+                f"yfin.dev fallback failed: {_short_error(fallback_exc)}"
+            ) from fallback_exc
+
+
+async def _collect_symbol_from_barchart(
+    symbol_config: SymbolConfig,
+    captured_at: datetime,
+    archive_dir: Path,
+) -> Snapshot:
     archive_dir.mkdir(parents=True, exist_ok=True)
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True)
+        browser = None
         context = None
         page = None
         expiration_response_task = None
         try:
+            browser = await playwright.chromium.launch(headless=True)
             context = await browser.new_context(user_agent=BROWSER_USER_AGENT)
             page = await context.new_page()
             expiration_response_task = _watch_for_options_expirations_response(page, timeout_ms=60000)
@@ -93,7 +118,85 @@ async def collect_symbol(symbol_config: SymbolConfig, captured_at: datetime, arc
         finally:
             if context is not None:
                 await context.close()
-            await browser.close()
+            if browser is not None:
+                await browser.close()
+
+
+async def _collect_symbol_from_yfin(
+    symbol_config: SymbolConfig,
+    captured_at: datetime,
+    archive_dir: Path,
+    primary_error: CollectionError,
+) -> Snapshot:
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    symbol = symbol_config.symbol.upper()
+    initial_payload = await _fetch_yfin_json(symbol)
+    raw_responses: list[dict[str, Any]] = [{"expiration": None, "payload": initial_payload}]
+    expiration_dates = _extract_yfin_expiration_dates(initial_payload, symbol)
+    seen_expirations = _extract_yfin_option_expirations(initial_payload, symbol)
+    for expiration in expiration_dates:
+        if expiration in seen_expirations:
+            continue
+        payload = await _fetch_yfin_json(symbol, expiration)
+        raw_responses.append({"expiration": expiration, "payload": payload})
+        seen_expirations.update(_extract_yfin_option_expirations(payload, symbol))
+
+    rows = _extract_yfin_rows([response["payload"] for response in raw_responses], symbol, captured_at)
+    source_url = _yfin_url(symbol)
+    snapshot = Snapshot(
+        symbol=symbol,
+        url=symbol_config.url,
+        captured_at=captured_at,
+        metrics=TopMetrics(None, None, None, None, None),
+        rows=rows,
+        data_source=DataSource(
+            name="yfin.dev",
+            url=source_url,
+            is_fallback=True,
+            note=f"Fallback after Barchart failed: {_short_error(primary_error)}",
+        ),
+    )
+    (archive_dir / f"{symbol_config.symbol}-yfin-raw.json").write_text(
+        json.dumps({"symbol": symbol, "responses": raw_responses}, indent=2),
+        encoding="utf-8",
+    )
+    (archive_dir / f"{symbol_config.symbol}-snapshot.json").write_text(
+        _snapshot_json(snapshot),
+        encoding="utf-8",
+    )
+    return snapshot
+
+
+async def _fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+    return await asyncio.to_thread(_fetch_json_from_url, _yfin_url(symbol, expiration))
+
+
+def _fetch_json_from_url(url: str) -> dict[str, Any]:
+    request = urllib.request.Request(url, headers={"User-Agent": BROWSER_USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            status = getattr(response, "status", None)
+            if status is not None and status >= 400:
+                raise CollectionError(f"yfin.dev returned HTTP {status}")
+            body = response.read().decode("utf-8")
+    except CollectionError:
+        raise
+    except Exception as exc:
+        raise CollectionError(str(exc)) from exc
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise CollectionError("yfin.dev returned invalid JSON") from exc
+    if not isinstance(payload, dict):
+        raise CollectionError("yfin.dev returned an invalid payload")
+    return payload
+
+
+def _yfin_url(symbol: str, expiration: int | None = None) -> str:
+    params: dict[str, str] = {"symbol": symbol.upper()}
+    if expiration is not None:
+        params["date"] = str(expiration)
+    return f"{YFIN_OPTIONS_URL}?{urllib.parse.urlencode(params)}"
 
 
 async def collect_from_html(symbol: str, url: str, html: str, captured_at: datetime) -> Snapshot:
@@ -328,6 +431,155 @@ def _required_api_value(row: dict, field: str, symbol: str) -> str:
     if value is None:
         raise CollectionError(f"{symbol} options expiration API row missing {field}")
     return str(value)
+
+
+def _extract_yfin_expiration_dates(payload: dict[str, Any], symbol: str) -> list[int]:
+    raw_dates = _yfin_result(payload, symbol).get("expirationDates")
+    if not isinstance(raw_dates, list) or not raw_dates:
+        raise CollectionError(f"{symbol} yfin.dev payload returned no expiration dates")
+    dates: list[int] = []
+    for raw_date in raw_dates:
+        try:
+            dates.append(int(raw_date))
+        except (TypeError, ValueError) as exc:
+            raise CollectionError(f"{symbol} yfin.dev payload contained invalid expiration date") from exc
+    return dates
+
+
+def _extract_yfin_option_expirations(payload: dict[str, Any], symbol: str) -> set[int]:
+    expirations: set[int] = set()
+    for option_chain in _yfin_options(payload, symbol):
+        expiration = option_chain.get("expirationDate")
+        if expiration is None:
+            continue
+        try:
+            expirations.add(int(expiration))
+        except (TypeError, ValueError) as exc:
+            raise CollectionError(f"{symbol} yfin.dev option chain contained invalid expirationDate") from exc
+    return expirations
+
+
+def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at: datetime) -> list[ExpirationRow]:
+    contracts_by_expiration: dict[int, dict[str, list[dict[str, Any]]]] = {}
+    for payload in payloads:
+        for option_chain in _yfin_options(payload, symbol):
+            expiration = option_chain.get("expirationDate")
+            if expiration is None:
+                raise CollectionError(f"{symbol} yfin.dev option chain missing expirationDate")
+            try:
+                expiration_timestamp = int(expiration)
+            except (TypeError, ValueError) as exc:
+                raise CollectionError(f"{symbol} yfin.dev option chain contained invalid expirationDate") from exc
+            grouped_contracts = contracts_by_expiration.setdefault(expiration_timestamp, {"calls": [], "puts": []})
+            calls = option_chain.get("calls", [])
+            puts = option_chain.get("puts", [])
+            if isinstance(calls, list):
+                grouped_contracts["calls"].extend(contract for contract in calls if isinstance(contract, dict))
+            if isinstance(puts, list):
+                grouped_contracts["puts"].extend(contract for contract in puts if isinstance(contract, dict))
+
+    if not contracts_by_expiration:
+        raise CollectionError(f"{symbol} yfin.dev payload returned no data rows")
+
+    rows = [
+        _yfin_expiration_to_row(expiration, contracts["calls"], contracts["puts"], captured_at)
+        for expiration, contracts in contracts_by_expiration.items()
+    ]
+    rows.sort(key=lambda row: row.expiration_date)
+    return rows
+
+
+def _yfin_result(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise CollectionError(f"{symbol} yfin.dev payload returned no data")
+    option_chain = data.get("optionChain")
+    if not isinstance(option_chain, dict):
+        raise CollectionError(f"{symbol} yfin.dev payload returned no optionChain")
+    result = option_chain.get("result")
+    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
+        raise CollectionError(f"{symbol} yfin.dev payload returned no result")
+    return result[0]
+
+
+def _yfin_options(payload: dict[str, Any], symbol: str) -> list[dict[str, Any]]:
+    options = _yfin_result(payload, symbol).get("options")
+    if not isinstance(options, list):
+        raise CollectionError(f"{symbol} yfin.dev payload returned no options")
+    return [option for option in options if isinstance(option, dict)]
+
+
+def _yfin_expiration_to_row(
+    expiration_timestamp: int,
+    calls: list[dict[str, Any]],
+    puts: list[dict[str, Any]],
+    captured_at: datetime,
+) -> ExpirationRow:
+    expiration_date = datetime.fromtimestamp(expiration_timestamp, tz=timezone.utc).date()
+    put_volume = _sum_yfin_contract_field(puts, "volume")
+    call_volume = _sum_yfin_contract_field(calls, "volume")
+    put_open_interest = _sum_yfin_contract_field(puts, "openInterest")
+    call_open_interest = _sum_yfin_contract_field(calls, "openInterest")
+    implied_volatility = _average_yfin_implied_volatility([*calls, *puts])
+    is_monthly = _is_standard_monthly_expiration(expiration_date)
+    return ExpirationRow(
+        expiration_label=f"{expiration_date:%m/%d/%y} ({'m' if is_monthly else 'w'})",
+        expiration_date=expiration_date,
+        dte=(expiration_date - captured_at.date()).days,
+        put_volume=put_volume,
+        call_volume=call_volume,
+        total_volume=put_volume + call_volume,
+        put_call_volume_ratio=_safe_ratio(put_volume, call_volume),
+        put_open_interest=put_open_interest,
+        call_open_interest=call_open_interest,
+        total_open_interest=put_open_interest + call_open_interest,
+        put_call_open_interest_ratio=_safe_ratio(put_open_interest, call_open_interest),
+        implied_volatility=implied_volatility,
+        is_monthly=is_monthly,
+    )
+
+
+def _sum_yfin_contract_field(contracts: list[dict[str, Any]], field: str) -> int:
+    total = 0
+    for contract in contracts:
+        value = contract.get(field)
+        if value is None:
+            continue
+        try:
+            total += int(value)
+        except (TypeError, ValueError):
+            total += int(float(value))
+    return total
+
+
+def _average_yfin_implied_volatility(contracts: list[dict[str, Any]]) -> float | None:
+    values: list[float] = []
+    for contract in contracts:
+        value = contract.get("impliedVolatility")
+        if value is None:
+            continue
+        values.append(float(value) * 100)
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _safe_ratio(numerator: int, denominator: int) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def _is_standard_monthly_expiration(expiration_date: date) -> bool:
+    first_day = expiration_date.replace(day=1)
+    third_friday = first_day + timedelta(days=(4 - first_day.weekday()) % 7 + 14)
+    return expiration_date in {third_friday, third_friday - timedelta(days=1)}
+
+
+def _short_error(error: BaseException) -> str:
+    message = str(error).split(";")[0]
+    extraction_prefix = " extraction failed: "
+    if extraction_prefix in message:
+        return message.split(extraction_prefix, 1)[1]
+    return message
 
 
 def _snapshot_json(snapshot: Snapshot) -> str:
