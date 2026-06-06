@@ -33,6 +33,6 @@
 - [x] Enable repository auto-merge and delete-branch-on-merge with `gh repo edit BlancosWay/options-put-call-reporter --enable-auto-merge --delete-branch-on-merge`.
 - [x] Run `./.venv/bin/python -m pytest -q`.
 - [x] Run `./.venv/bin/python -m build`.
-- [ ] Commit the workflow and test changes.
+- [x] Commit the workflow and test changes.
 - [ ] Push the branch and create a pull request.
 - [ ] Confirm GitHub Actions passes for the pull request.
