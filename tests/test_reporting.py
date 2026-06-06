@@ -4,6 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from reporter.models import (
+    DataSource,
     DriftItem,
     ExpirationRow,
     MonthlySignal,
@@ -17,7 +18,13 @@ from reporter.models import (
 from reporter.reporting import render_reports
 
 
-def _snapshot_for_layout(symbol: str, captured_at: datetime, monthly_signal: Signal, commentary: str) -> tuple[Snapshot, SymbolAnalysis]:
+def _snapshot_for_layout(
+    symbol: str,
+    captured_at: datetime,
+    monthly_signal: Signal,
+    commentary: str,
+    data_source: DataSource | None = None,
+) -> tuple[Snapshot, SymbolAnalysis]:
     if symbol == "NOW":
         metrics = TopMetrics("07/22/26", 30.86, 37.28, 29.62, 39.0)
         rows = [
@@ -44,6 +51,7 @@ def _snapshot_for_layout(symbol: str, captured_at: datetime, monthly_signal: Sig
         captured_at=captured_at,
         metrics=metrics,
         rows=rows,
+        **({"data_source": data_source} if data_source is not None else {}),
     )
     analysis = SymbolAnalysis(
         symbol=symbol,
@@ -53,6 +61,23 @@ def _snapshot_for_layout(symbol: str, captured_at: datetime, monthly_signal: Sig
         commentary=commentary,
     )
     return snapshot, analysis
+
+
+def _successful_symbol_report_with_source(
+    symbol: str,
+    monthly_signal: Signal,
+    commentary: str,
+    data_source: DataSource | None = None,
+) -> SymbolReport:
+    captured_at = datetime(2026, 6, 2, 21, 30)
+    snapshot, analysis = _snapshot_for_layout(
+        symbol,
+        captured_at,
+        monthly_signal,
+        commentary,
+        data_source,
+    )
+    return SymbolReport(symbol=symbol, snapshot=snapshot, analysis=analysis, drift=[])
 
 
 def _successful_symbol_report(symbol: str, monthly_signal: Signal, commentary: str) -> SymbolReport:
@@ -603,6 +628,91 @@ def test_render_reports_writes_markdown_html_and_csv(tmp_path: Path) -> None:
     assert csv_values["put_call_volume_ratio"] == "0.44"
     assert csv_values["put_call_open_interest_ratio"] == "0.9"
     assert csv_values["is_monthly"] == "True"
+
+
+def test_render_reports_discloses_data_sources_in_html_markdown_and_csv(tmp_path: Path) -> None:
+    fallback_source = DataSource(
+        name="yfin.dev",
+        url="https://api.yfin.dev/v1/options?symbol=META",
+        is_fallback=True,
+        note="Fallback after Barchart failed: primary <failed> & timed out",
+    )
+    bundle = render_reports(
+        generated_at=datetime(2026, 6, 2, 21, 35),
+        symbol_reports=[
+            _successful_symbol_report_with_source(
+                "NOW",
+                Signal.BULLISH,
+                "NOW: bullish call demand remains constructive.",
+            ),
+            _successful_symbol_report_with_source(
+                "META",
+                Signal.BEARISH_HEDGING,
+                "META: bearish hedging remains elevated.",
+                fallback_source,
+            ),
+            SymbolReport(
+                symbol="ERR",
+                snapshot=None,
+                analysis=None,
+                drift=[],
+                error="fetch timed out",
+            ),
+        ],
+        archive_dir=tmp_path,
+    )
+
+    html = bundle.html_path.read_text(encoding="utf-8")
+    summary_table = _extract_element_by_class(html, "table", "summary-table")
+    _assert_contains_all(summary_table, ["<th>Source</th>", "Barchart", "yfin.dev (fallback)"])
+    err_summary_row = _row_containing(_extract_summary_rows(summary_table), "ERR")
+    assert "<td>—</td>" in err_summary_row
+    now_detail = _extract_symbol_detail_block(html, "NOW")
+    meta_detail = _extract_symbol_detail_block(html, "META")
+    _assert_contains_all(now_detail, ["Data source:", "Barchart", "https://www.barchart.com"])
+    _assert_contains_all(
+        meta_detail,
+        [
+            "Data source:",
+            "yfin.dev (fallback)",
+            "https://api.yfin.dev/v1/options?symbol=META",
+            "Fallback after Barchart failed: primary &lt;failed&gt; &amp; timed out",
+        ],
+    )
+    assert "primary <failed>" not in html
+
+    markdown = bundle.markdown_path.read_text(encoding="utf-8")
+    now_markdown = _extract_markdown_symbol_section(markdown, "NOW")
+    meta_markdown = _extract_markdown_symbol_section(markdown, "META")
+    _assert_contains_all(
+        now_markdown,
+        ["### Data Source", "- Name: Barchart", "- URL: https://www.barchart.com", "- Fallback: No"],
+    )
+    _assert_contains_all(
+        meta_markdown,
+        [
+            "### Data Source",
+            "- Name: yfin.dev",
+            "- URL: https://api.yfin.dev/v1/options?symbol=META",
+            "- Fallback: Yes",
+            "- Note: Fallback after Barchart failed: primary <failed> & timed out",
+        ],
+    )
+
+    with (tmp_path / "META-expirations.csv").open(encoding="utf-8", newline="") as file:
+        meta_csv_rows = list(csv.DictReader(file))
+    assert meta_csv_rows
+    assert meta_csv_rows[0]["data_source_name"] == "yfin.dev"
+    assert meta_csv_rows[0]["data_source_url"] == "https://api.yfin.dev/v1/options?symbol=META"
+    assert meta_csv_rows[0]["data_source_is_fallback"] == "True"
+    assert meta_csv_rows[0]["data_source_note"] == "Fallback after Barchart failed: primary <failed> & timed out"
+
+    with (tmp_path / "NOW-expirations.csv").open(encoding="utf-8", newline="") as file:
+        now_csv_rows = list(csv.DictReader(file))
+    assert now_csv_rows[0]["data_source_name"] == "Barchart"
+    assert now_csv_rows[0]["data_source_url"] == "https://www.barchart.com"
+    assert now_csv_rows[0]["data_source_is_fallback"] == "False"
+    assert now_csv_rows[0]["data_source_note"] == ""
 
 
 def test_render_reports_uses_dash_for_missing_metrics(tmp_path: Path) -> None:
