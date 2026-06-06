@@ -1,6 +1,9 @@
+import json
+import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import reporter.models as models
 from reporter.history import HistoryStore
 from reporter.models import ExpirationRow, Snapshot, TopMetrics
 
@@ -60,6 +63,85 @@ def test_history_store_round_trips_snapshot(tmp_path: Path) -> None:
     assert loaded.rows[0].put_call_open_interest_ratio == 0.54
     assert loaded.rows[0].implied_volatility == 32.94
     assert loaded.rows[0].is_monthly is True
+
+
+def test_snapshot_defaults_to_barchart_data_source() -> None:
+    current = snapshot("MSFT", datetime(2026, 6, 2, 21, 30), 0.31)
+
+    assert current.data_source == models.default_barchart_source()
+    assert current.data_source.name == "Barchart"
+    assert current.data_source.url == "https://www.barchart.com"
+    assert current.data_source.is_fallback is False
+    assert current.data_source.note is None
+
+
+def test_history_store_round_trips_data_source(tmp_path: Path) -> None:
+    store = HistoryStore(tmp_path / "history.sqlite3")
+    source = models.DataSource(
+        name="yfin.dev",
+        url="https://yfin.dev/api/options/MSFT",
+        is_fallback=True,
+        note="Barchart was unavailable",
+    )
+    current = Snapshot(
+        symbol="MSFT",
+        url="https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        metrics=TopMetrics("07/29/26", 31.62, 33.28, 61.17, 85.0),
+        rows=[],
+        data_source=source,
+    )
+
+    store.save_snapshot(current)
+    loaded = store.latest_snapshot("MSFT")
+
+    assert loaded is not None
+    assert loaded.data_source == source
+
+
+def test_history_store_defaults_legacy_rows_to_barchart_data_source(tmp_path: Path) -> None:
+    database_path = tmp_path / "history.sqlite3"
+    captured_at = datetime(2026, 6, 2, 21, 30)
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                url TEXT NOT NULL,
+                captured_at TEXT NOT NULL,
+                metrics_json TEXT NOT NULL,
+                rows_json TEXT NOT NULL,
+                UNIQUE(symbol, captured_at)
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO snapshots(symbol, url, captured_at, metrics_json, rows_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "MSFT",
+                "https://www.barchart.com/stocks/quotes/msft/put-call-ratios",
+                captured_at.isoformat(),
+                json.dumps(
+                    {
+                        "latest_earnings": "07/29/26",
+                        "implied_volatility": 31.62,
+                        "historic_volatility": 33.28,
+                        "iv_rank": 61.17,
+                        "iv_percentile": 85.0,
+                    }
+                ),
+                json.dumps([]),
+            ),
+        )
+
+    loaded = HistoryStore(database_path).latest_snapshot("MSFT")
+
+    assert loaded is not None
+    assert loaded.data_source == models.default_barchart_source()
 
 
 def test_history_store_finds_prior_day_week_month(tmp_path: Path) -> None:

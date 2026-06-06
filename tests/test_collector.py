@@ -1,7 +1,8 @@
 import html
 import json
+import math
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -146,6 +147,7 @@ class _FakeBrowser:
     def __init__(self, playwright: "_FakePlaywright") -> None:
         self._playwright = playwright
         self.closed = False
+        self.close_attempted = False
 
     async def new_context(self, *, user_agent: str) -> "_FakeContext":
         self._playwright.context_user_agents.append(user_agent)
@@ -159,6 +161,9 @@ class _FakeBrowser:
         return page
 
     async def close(self) -> None:
+        self.close_attempted = True
+        if self._playwright.browser_close_error is not None:
+            raise self._playwright.browser_close_error
         self.closed = True
 
 
@@ -166,6 +171,7 @@ class _FakeContext:
     def __init__(self, playwright: "_FakePlaywright") -> None:
         self._playwright = playwright
         self.closed = False
+        self.close_attempted = False
 
     async def new_page(self) -> _FakePage:
         page = self._playwright.new_page()
@@ -173,6 +179,9 @@ class _FakeContext:
         return page
 
     async def close(self) -> None:
+        self.close_attempted = True
+        if self._playwright.context_close_error is not None:
+            raise self._playwright.context_close_error
         self.closed = True
 
 
@@ -196,6 +205,8 @@ class _FakeChromium:
 
     async def launch(self, *, headless: bool) -> _FakeBrowser:
         assert headless is True
+        if self._playwright.launch_error is not None:
+            raise self._playwright.launch_error
         self._playwright.launch_count += 1
         browser = _FakeBrowser(self._playwright)
         self._playwright.browsers.append(browser)
@@ -203,8 +214,22 @@ class _FakeChromium:
 
 
 class _FakePlaywright:
-    def __init__(self, page_factory) -> None:
+    def __init__(
+        self,
+        page_factory,
+        *,
+        launch_error: Exception | None = None,
+        enter_error: Exception | None = None,
+        exit_error: Exception | None = None,
+        context_close_error: Exception | None = None,
+        browser_close_error: Exception | None = None,
+    ) -> None:
         self._page_factory = page_factory
+        self.launch_error = launch_error
+        self.enter_error = enter_error
+        self.exit_error = exit_error
+        self.context_close_error = context_close_error
+        self.browser_close_error = browser_close_error
         self.chromium = _FakeChromium(self)
         self.launch_count = 0
         self.pages: list[_FakePage] = []
@@ -216,9 +241,13 @@ class _FakePlaywright:
         return self._page_factory()
 
     async def __aenter__(self) -> "_FakePlaywright":
+        if self.enter_error is not None:
+            raise self.enter_error
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
+        if self.exit_error is not None:
+            raise self.exit_error
         return None
 
 
@@ -291,6 +320,21 @@ def _options_expirations_response() -> dict[str, Any]:
                 "averageVolatility": "32.10%",
             },
         ],
+    }
+
+
+def _yfin_payload(expiration_dates: list[int], options: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "data": {
+            "optionChain": {
+                "result": [
+                    {
+                        "expirationDates": expiration_dates,
+                        "options": options,
+                    }
+                ]
+            }
+        }
     }
 
 
@@ -414,7 +458,7 @@ async def test_collect_symbol_uses_realistic_browser_user_agent(
     fake_playwright = _FakePlaywright(lambda: _FakePage(html))
     _install_fake_playwright(monkeypatch, fake_playwright)
 
-    await collect_symbol(
+    await collector._collect_symbol_from_barchart(
         SymbolConfig("msft", "https://example.test/msft"),
         captured_at=datetime(2026, 6, 2, 21, 30),
         archive_dir=tmp_path,
@@ -437,7 +481,7 @@ async def test_collect_symbol_fails_fast_on_blocked_http_status(
     _install_fake_playwright(monkeypatch, fake_playwright)
 
     with pytest.raises(CollectionError) as exc_info:
-        await collect_symbol(
+        await collector._collect_symbol_from_barchart(
             SymbolConfig("MSFT", "https://example.test/msft"),
             captured_at=datetime(2026, 6, 2, 21, 30),
             archive_dir=tmp_path,
@@ -458,7 +502,7 @@ async def test_collect_symbol_cleans_response_listener_when_navigation_raises(
     _install_fake_playwright(monkeypatch, fake_playwright)
 
     with pytest.raises(CollectionError) as exc_info:
-        await collect_symbol(
+        await collector._collect_symbol_from_barchart(
             SymbolConfig("MSFT", "https://example.test/msft"),
             captured_at=datetime(2026, 6, 2, 21, 30),
             archive_dir=tmp_path,
@@ -466,6 +510,436 @@ async def test_collect_symbol_cleans_response_listener_when_navigation_raises(
 
     assert "navigation failed" in str(exc_info.value)
     assert page.response_listener_events == ["on", "remove"]
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_barchart_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage("<html>blocked</html>", goto_error=RuntimeError("Barchart blocked"))
+    fake_playwright = _FakePlaywright(lambda: page)
+    _install_fake_playwright(monkeypatch, fake_playwright)
+    fetch_calls: list[tuple[str, int | None]] = []
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        fetch_calls.append((symbol, expiration))
+        if expiration is None:
+            return _yfin_payload(
+                [1781740800, 1782432000],
+                [
+                    {
+                        "expirationDate": 1781740800,
+                        "calls": [
+                            {"volume": 100, "openInterest": 5, "impliedVolatility": 0.2},
+                            {"volume": None, "openInterest": 15, "impliedVolatility": None},
+                        ],
+                        "puts": [
+                            {"volume": 50, "openInterest": 10, "impliedVolatility": 0.4},
+                            {"volume": 30, "openInterest": None},
+                        ],
+                    }
+                ],
+            )
+        if expiration == 1782432000:
+            return _yfin_payload(
+                [1781740800, 1782432000],
+                [
+                    {
+                        "expirationDate": 1782432000,
+                        "calls": [{"volume": 0, "openInterest": 0}],
+                        "puts": [{"volume": 7, "openInterest": 9}],
+                    }
+                ],
+            )
+        raise AssertionError(f"unexpected yfin expiration {expiration}")
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json, raising=False)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("msft", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.symbol == "MSFT"
+    assert snapshot.metrics.latest_earnings is None
+    assert snapshot.metrics.iv_rank is None
+    assert snapshot.data_source.name == "yfin.dev"
+    assert snapshot.data_source.url == "https://api.yfin.dev/v1/options?symbol=MSFT"
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note is not None
+    assert snapshot.data_source.note.startswith("Fallback after Barchart failed: Barchart blocked")
+    assert fetch_calls == [("MSFT", None), ("MSFT", 1782432000)]
+    assert [row.expiration_label for row in snapshot.rows] == ["06/18/26 (m)", "06/26/26 (w)"]
+    assert snapshot.rows[0].dte == 16
+    assert snapshot.rows[0].put_volume == 80
+    assert snapshot.rows[0].call_volume == 100
+    assert snapshot.rows[0].total_volume == 180
+    assert snapshot.rows[0].put_open_interest == 10
+    assert snapshot.rows[0].call_open_interest == 20
+    assert snapshot.rows[0].total_open_interest == 30
+    assert snapshot.rows[0].put_call_volume_ratio == 0.8
+    assert snapshot.rows[0].put_call_open_interest_ratio == 0.5
+    assert snapshot.rows[0].implied_volatility == 30.0
+    assert snapshot.rows[0].is_monthly is True
+    assert snapshot.rows[1].expiration_label == "06/26/26 (w)"
+    assert math.isinf(snapshot.rows[1].put_call_volume_ratio)
+    assert math.isinf(snapshot.rows[1].put_call_open_interest_ratio)
+    assert snapshot.rows[1].implied_volatility is None
+    raw_json = json.loads((tmp_path / "msft-yfin-raw.json").read_text(encoding="utf-8"))
+    assert raw_json["symbol"] == "MSFT"
+    assert len(raw_json["responses"]) == 2
+    snapshot_json = json.loads((tmp_path / "msft-snapshot.json").read_text(encoding="utf-8"))
+    assert snapshot_json["data_source"]["name"] == "yfin.dev"
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_browser_launch_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    fake_playwright = _FakePlaywright(lambda: _FakePage(), launch_error=RuntimeError("chromium missing"))
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        assert symbol == "MSFT"
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: chromium missing"
+    assert snapshot.rows[0].put_volume == 3
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_playwright_startup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    fake_playwright = _FakePlaywright(
+        lambda: _FakePage(),
+        enter_error=RuntimeError("playwright startup failed"),
+    )
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        assert symbol == "MSFT"
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: playwright startup failed"
+    assert snapshot.rows[0].put_volume == 3
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_barchart_and_cleanup_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage("<html>blocked</html>", goto_error=RuntimeError("primary blocked"))
+    fake_playwright = _FakePlaywright(
+        lambda: page,
+        context_close_error=RuntimeError("context close failed"),
+        browser_close_error=RuntimeError("browser close failed"),
+    )
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        assert symbol == "MSFT"
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: primary blocked"
+    assert snapshot.rows[0].put_volume == 3
+    assert fake_playwright.contexts[0].close_attempted is True
+    assert fake_playwright.browsers[0].close_attempted is True
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_barchart_and_playwright_manager_exit_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage("<html>blocked</html>", goto_error=RuntimeError("primary blocked"))
+    fake_playwright = _FakePlaywright(
+        lambda: page,
+        exit_error=RuntimeError("playwright manager exit failed"),
+    )
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        assert symbol == "MSFT"
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: primary blocked"
+    assert snapshot.rows[0].put_volume == 3
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_falls_back_to_yfin_when_cleanup_fails_after_barchart_success(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    html = _toolbar_html()
+    fake_playwright = _FakePlaywright(
+        lambda: _FakePage(html),
+        context_close_error=RuntimeError("context close failed"),
+    )
+    _install_fake_playwright(monkeypatch, fake_playwright)
+    yfin_calls: list[str] = []
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        yfin_calls.append(symbol)
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
+
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
+
+    assert yfin_calls == ["MSFT"]
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: context close failed"
+    assert snapshot.rows[0].put_volume == 3
+
+
+@pytest.mark.asyncio
+async def test_collect_symbol_error_includes_barchart_and_yfin_causes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    page = _FakePage("<html>blocked</html>", goto_error=RuntimeError("primary blocked"))
+    fake_playwright = _FakePlaywright(lambda: page)
+    _install_fake_playwright(monkeypatch, fake_playwright)
+
+    async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
+        raise CollectionError("fallback unavailable")
+
+    monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json, raising=False)
+
+    with pytest.raises(CollectionError) as exc_info:
+        await collect_symbol(
+            SymbolConfig("MSFT", "https://example.test/msft"),
+            captured_at=datetime(2026, 6, 2, 21, 30),
+            archive_dir=tmp_path,
+        )
+
+    message = str(exc_info.value)
+    assert "Barchart failed:" in message
+    assert "primary blocked" in message
+    assert "yfin.dev fallback failed:" in message
+    assert "fallback unavailable" in message
+
+
+@pytest.mark.asyncio
+async def test_fetch_yfin_json_uses_to_thread_with_expected_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, str]] = []
+
+    async def fake_to_thread(func, url: str) -> dict[str, Any]:
+        calls.append((func, url))
+        return {"ok": True}
+
+    monkeypatch.setattr(collector.asyncio, "to_thread", fake_to_thread)
+
+    assert await collector._fetch_yfin_json("msft") == {"ok": True}
+    assert await collector._fetch_yfin_json("msft", 1781740800) == {"ok": True}
+    assert calls == [
+        (collector._fetch_json_from_url, "https://api.yfin.dev/v1/options?symbol=MSFT"),
+        (collector._fetch_json_from_url, "https://api.yfin.dev/v1/options?symbol=MSFT&date=1781740800"),
+    ]
+
+
+def test_extract_yfin_rows_rejects_payloads_without_data_rows() -> None:
+    with pytest.raises(CollectionError) as exc_info:
+        collector._extract_yfin_rows([_yfin_payload([1781740800], [])], "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert "MSFT yfin.dev payload returned no data rows" in str(exc_info.value)
+
+
+def test_extract_yfin_rows_rejects_expirations_without_contracts() -> None:
+    payload = _yfin_payload([1781740800], [{"expirationDate": 1781740800, "calls": [], "puts": []}])
+
+    with pytest.raises(CollectionError) as exc_info:
+        collector._extract_yfin_rows([payload], "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert "MSFT yfin.dev payload returned no data rows" in str(exc_info.value)
+
+
+def test_extract_yfin_rows_skips_expirations_without_contracts() -> None:
+    payload = _yfin_payload(
+        [1781740800, 1782432000],
+        [
+            {"expirationDate": 1781740800, "calls": [], "puts": []},
+            {"expirationDate": 1782432000, "calls": [{"volume": 5, "openInterest": 2}], "puts": []},
+        ],
+    )
+
+    rows = collector._extract_yfin_rows([payload], "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert len(rows) == 1
+    assert rows[0].expiration_date == date(2026, 6, 26)
+    assert rows[0].call_volume == 5
+
+
+def test_extract_yfin_rows_deduplicates_contract_symbols_by_side_and_expiration() -> None:
+    expiration = 1781740800
+    duplicate_chain = {
+        "expirationDate": expiration,
+        "calls": [{"contractSymbol": "MSFT260618C00100000", "volume": 10, "openInterest": 100}],
+        "puts": [{"contractSymbol": "MSFT260618P00100000", "volume": 4, "openInterest": 40}],
+    }
+    distinct_chain = {
+        "expirationDate": expiration,
+        "calls": [{"contractSymbol": "MSFT260618C00105000", "volume": 5, "openInterest": 50}],
+        "puts": [{"contractSymbol": "MSFT260618P00105000", "volume": 8, "openInterest": 80}],
+    }
+    payloads = [
+        _yfin_payload([expiration], [duplicate_chain]),
+        _yfin_payload([expiration], [duplicate_chain, distinct_chain]),
+    ]
+
+    rows = collector._extract_yfin_rows(payloads, "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.put_volume == 12
+    assert row.call_volume == 15
+    assert row.total_volume == 27
+    assert row.put_call_volume_ratio == 0.8
+    assert row.put_open_interest == 120
+    assert row.call_open_interest == 150
+    assert row.total_open_interest == 270
+    assert row.put_call_open_interest_ratio == 0.8
+
+
+def test_extract_yfin_rows_deduplicates_no_symbol_contracts_across_duplicate_payloads() -> None:
+    expiration = 1781740800
+    chain_without_contract_symbols = {
+        "expirationDate": expiration,
+        "calls": [
+            {"strike": 100, "volume": 10, "openInterest": 100},
+            {"strike": 100, "volume": 20, "openInterest": 200},
+        ],
+        "puts": [
+            {"strike": 100, "volume": 4, "openInterest": 40},
+            {"strike": 100, "volume": 8, "openInterest": 80},
+        ],
+    }
+    payloads = [
+        _yfin_payload([expiration], [chain_without_contract_symbols]),
+        _yfin_payload([expiration], [chain_without_contract_symbols]),
+    ]
+
+    rows = collector._extract_yfin_rows(payloads, "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.call_volume == 30
+    assert row.put_volume == 12
+    assert row.call_open_interest == 300
+    assert row.put_open_interest == 120
+    assert row.put_call_volume_ratio == 0.4
+    assert row.put_call_open_interest_ratio == 0.4
+
+
+def test_safe_ratio_returns_infinity_for_positive_numerator_over_zero_denominator() -> None:
+    assert math.isinf(collector._safe_ratio(5, 0))
+    assert collector._safe_ratio(0, 0) == 0.0
+    assert collector._safe_ratio(5, 2) == 2.5
+
+
+def test_yfin_monthly_detection_only_marks_holiday_thursday_adjustment() -> None:
+    assert collector._is_standard_monthly_expiration(date(2026, 6, 18)) is True
+    assert collector._is_standard_monthly_expiration(date(2027, 6, 17)) is True
+    assert collector._is_standard_monthly_expiration(date(2027, 6, 18)) is False
+    assert collector._is_standard_monthly_expiration(date(2026, 7, 16)) is False
+    assert collector._is_standard_monthly_expiration(date(2026, 7, 17)) is True
 
 
 @pytest.mark.asyncio
@@ -521,7 +995,7 @@ async def test_collect_symbol_waits_for_top_metrics_toolbar(
     fake_playwright = _FakePlaywright(lambda: page)
     _install_fake_playwright(monkeypatch, fake_playwright)
 
-    await collect_symbol(
+    await collector._collect_symbol_from_barchart(
         SymbolConfig("msft", "https://example.test/msft"),
         captured_at=datetime(2026, 6, 2, 21, 30),
         archive_dir=tmp_path,
@@ -539,7 +1013,7 @@ async def test_collect_symbol_uses_domcontentloaded_then_waits_for_expiration_he
     fake_playwright = _FakePlaywright(lambda: _FakePage(html))
     _install_fake_playwright(monkeypatch, fake_playwright)
 
-    await collect_symbol(
+    await collector._collect_symbol_from_barchart(
         SymbolConfig("msft", "https://example.test/msft"),
         captured_at=datetime(2026, 6, 2, 21, 30),
         archive_dir=tmp_path,
@@ -560,7 +1034,7 @@ async def test_collect_symbol_failure_includes_original_cause_and_diagnostic_pat
     _install_fake_playwright(monkeypatch, fake_playwright)
 
     with pytest.raises(CollectionError) as exc_info:
-        await collect_symbol(
+        await collector._collect_symbol_from_barchart(
             SymbolConfig("MSFT", "https://example.test/msft"),
             captured_at=datetime(2026, 6, 2, 21, 30),
             archive_dir=tmp_path,
@@ -588,7 +1062,7 @@ async def test_collect_symbol_diagnostic_capture_failure_does_not_mask_original_
     _install_fake_playwright(monkeypatch, fake_playwright)
 
     with pytest.raises(CollectionError) as exc_info:
-        await collect_symbol(
+        await collector._collect_symbol_from_barchart(
             SymbolConfig("MSFT", "https://example.test/msft"),
             captured_at=datetime(2026, 6, 2, 21, 30),
             archive_dir=tmp_path,
