@@ -55,6 +55,8 @@ def _format_value(value: object | None) -> str:
         return str(value)
     if isinstance(value, int):
         return _format_number(value)
+    if isinstance(value, float):
+        return f"{value:.2f}"
     return str(value)
 
 
