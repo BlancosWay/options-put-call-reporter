@@ -621,16 +621,24 @@ Target repository: `https://github.com/BlancosWay/options-put-call-reporter`
 ## Create the public repository with GitHub CLI
 
 ```bash
-gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push
+if gh repo view BlancosWay/options-put-call-reporter >/dev/null 2>&1; then
+  echo "Repository already exists: BlancosWay/options-put-call-reporter"
+else
+  gh repo create BlancosWay/options-put-call-reporter --public
+fi
+git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
+git push -u origin HEAD
 ```
 
 ## Manual fallback
 
 If GitHub CLI is unavailable:
 
+Create an empty public GitHub repository named `BlancosWay/options-put-call-reporter` before running the fallback commands.
+
 ```bash
 git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
-git push -u origin feature/daily-options-report
+git push -u origin HEAD
 ```
 
 Then open GitHub, create a pull request into `main`, and require the CI workflow before merging.
@@ -1220,14 +1228,13 @@ Expected: if `gh` exists and is authenticated, continue to Step 6. If not, skip 
 Run:
 
 ```bash
-gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push
-```
-
-If the repository already exists, run:
-
-```bash
+if gh repo view BlancosWay/options-put-call-reporter >/dev/null 2>&1; then
+  echo "Repository already exists: BlancosWay/options-put-call-reporter"
+else
+  gh repo create BlancosWay/options-put-call-reporter --public
+fi
 git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
-git push -u origin feature/daily-options-report
+git push -u origin HEAD
 ```
 
 Expected: branch is pushed to GitHub.
@@ -1239,7 +1246,7 @@ Report these exact commands:
 ```bash
 cd /Users/sri/personal/options-put-call-reporter/.worktrees/daily-options-report
 git remote add origin https://github.com/BlancosWay/options-put-call-reporter.git 2>/dev/null || git remote set-url origin https://github.com/BlancosWay/options-put-call-reporter.git
-git push -u origin feature/daily-options-report
+git push -u origin HEAD
 ```
 
 Also state: create a public GitHub repository named `options-put-call-reporter` under `BlancosWay` before running them if it does not already exist.

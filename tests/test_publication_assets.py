@@ -90,6 +90,19 @@ def test_publishing_docs_include_existing_origin_safe_commands() -> None:
     assert "gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push" not in publishing
 
 
+def test_publication_guidance_uses_safe_push_commands() -> None:
+    publication_paths = [
+        "docs/PUBLISHING.md",
+        "docs/superpowers/specs/2026-06-05-github-publishing-agent-distribution-design.md",
+        "docs/superpowers/plans/2026-06-06-github-publishing-agent-distribution.md",
+    ]
+
+    for path in publication_paths:
+        content = _read(path)
+        assert "gh repo create BlancosWay/options-put-call-reporter --public --source=. --remote=origin --push" not in content
+        assert "git push -u origin feature/daily-options-report" not in content
+
+
 def test_publication_assets_target_blancosway_not_prior_owner() -> None:
     old_owner = "srina" + "del"
     publication_paths = [
