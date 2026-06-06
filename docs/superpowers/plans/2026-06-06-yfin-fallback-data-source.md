@@ -33,7 +33,7 @@
 - [ ] Add a private `_collect_symbol_from_barchart()` containing the current Playwright implementation.
 - [ ] Make `collect_symbol()` try Barchart first, then yfin on `CollectionError`.
 - [ ] Add yfin HTTP helpers using `asyncio.to_thread()` around `urllib.request.urlopen()`.
-- [ ] Aggregate yfin calls/puts into `ExpirationRow` values.
+- [ ] Aggregate yfin calls/puts into `ExpirationRow` values. Deduplicate repeated contracts per expiration and side using `contractSymbol` when present; for no-symbol contracts, use side, expiration, strike, and position within the side chain without payload or option-chain indexes. Compute denominator-zero ratios as `0.0` only when the numerator is also zero; otherwise use infinity.
 - [ ] Archive fallback raw JSON as `{symbol}-yfin-raw.json` and snapshot JSON as before.
 - [ ] If yfin also fails, raise `CollectionError` with both primary and fallback causes.
 - [ ] Run `pytest tests/test_collector.py -q`.

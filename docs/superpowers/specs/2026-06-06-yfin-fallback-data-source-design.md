@@ -19,7 +19,7 @@ The fallback calls `https://api.yfin.dev/v1/options?symbol={SYMBOL}` to get expi
 - Put open interest is the sum of put contract `openInterest`.
 - Call open interest is the sum of call contract `openInterest`.
 - Total volume and total open interest are computed from those sums.
-- Put/call ratios are computed from the aggregated totals; if the denominator is zero, the ratio is `0.0`.
+- Put/call ratios are computed from the aggregated totals. When the denominator is nonzero, the ratio is numerator divided by denominator. When both numerator and denominator are zero, the ratio is `0.0`; when the numerator is positive and the denominator is zero, the in-memory ratio is `float("inf")` so put-heavy zero-call data remains bearish/hedging-heavy downstream. Diagnostic JSON emitted by Python may serialize that value as `Infinity`.
 - Implied volatility is the arithmetic average of contract `impliedVolatility` values converted from decimal form to percent.
 - Expirations on the standard monthly expiration date are marked monthly; other expirations are weekly.
 

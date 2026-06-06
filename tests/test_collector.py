@@ -1,5 +1,6 @@
 import html
 import json
+import math
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -558,8 +559,8 @@ async def test_collect_symbol_falls_back_to_yfin_when_barchart_fails(
     assert snapshot.rows[0].implied_volatility == 30.0
     assert snapshot.rows[0].is_monthly is True
     assert snapshot.rows[1].expiration_label == "06/26/26 (w)"
-    assert snapshot.rows[1].put_call_volume_ratio == 0.0
-    assert snapshot.rows[1].put_call_open_interest_ratio == 0.0
+    assert math.isinf(snapshot.rows[1].put_call_volume_ratio)
+    assert math.isinf(snapshot.rows[1].put_call_open_interest_ratio)
     assert snapshot.rows[1].implied_volatility is None
     raw_json = json.loads((tmp_path / "msft-yfin-raw.json").read_text(encoding="utf-8"))
     assert raw_json["symbol"] == "MSFT"
@@ -710,6 +711,42 @@ def test_extract_yfin_rows_deduplicates_contract_symbols_by_side_and_expiration(
     assert row.call_open_interest == 150
     assert row.total_open_interest == 270
     assert row.put_call_open_interest_ratio == 0.8
+
+
+def test_extract_yfin_rows_deduplicates_no_symbol_contracts_across_duplicate_payloads() -> None:
+    expiration = 1781740800
+    chain_without_contract_symbols = {
+        "expirationDate": expiration,
+        "calls": [
+            {"strike": 100, "volume": 10, "openInterest": 100},
+            {"strike": 100, "volume": 20, "openInterest": 200},
+        ],
+        "puts": [
+            {"strike": 100, "volume": 4, "openInterest": 40},
+            {"strike": 100, "volume": 8, "openInterest": 80},
+        ],
+    }
+    payloads = [
+        _yfin_payload([expiration], [chain_without_contract_symbols]),
+        _yfin_payload([expiration], [chain_without_contract_symbols]),
+    ]
+
+    rows = collector._extract_yfin_rows(payloads, "MSFT", datetime(2026, 6, 2, 21, 30))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.call_volume == 30
+    assert row.put_volume == 12
+    assert row.call_open_interest == 300
+    assert row.put_open_interest == 120
+    assert row.put_call_volume_ratio == 0.4
+    assert row.put_call_open_interest_ratio == 0.4
+
+
+def test_safe_ratio_returns_infinity_for_positive_numerator_over_zero_denominator() -> None:
+    assert math.isinf(collector._safe_ratio(5, 0))
+    assert collector._safe_ratio(0, 0) == 0.0
+    assert collector._safe_ratio(5, 2) == 2.5
 
 
 def test_yfin_monthly_detection_only_marks_holiday_thursday_adjustment() -> None:

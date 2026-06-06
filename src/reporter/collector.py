@@ -462,8 +462,8 @@ def _extract_yfin_option_expirations(payload: dict[str, Any], symbol: str) -> se
 def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at: datetime) -> list[ExpirationRow]:
     contracts_by_expiration: dict[int, dict[str, list[dict[str, Any]]]] = {}
     seen_contracts: dict[int, dict[str, set[tuple[str, str]]]] = {}
-    for payload_index, payload in enumerate(payloads):
-        for option_chain_index, option_chain in enumerate(_yfin_options(payload, symbol)):
+    for payload in payloads:
+        for option_chain in _yfin_options(payload, symbol):
             expiration = option_chain.get("expirationDate")
             if expiration is None:
                 raise CollectionError(f"{symbol} yfin.dev option chain missing expirationDate")
@@ -484,8 +484,6 @@ def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at:
                     valid_calls,
                     "calls",
                     expiration_timestamp,
-                    payload_index,
-                    option_chain_index,
                     seen_for_expiration["calls"],
                 )
             )
@@ -494,8 +492,6 @@ def _extract_yfin_rows(payloads: list[dict[str, Any]], symbol: str, captured_at:
                     valid_puts,
                     "puts",
                     expiration_timestamp,
-                    payload_index,
-                    option_chain_index,
                     seen_for_expiration["puts"],
                 )
             )
@@ -515,8 +511,6 @@ def _deduplicate_yfin_contracts(
     contracts: list[dict[str, Any]],
     side: str,
     expiration_timestamp: int,
-    payload_index: int,
-    option_chain_index: int,
     seen: set[tuple[str, str]],
 ) -> list[dict[str, Any]]:
     unique_contracts: list[dict[str, Any]] = []
@@ -525,8 +519,6 @@ def _deduplicate_yfin_contracts(
             contract,
             side,
             expiration_timestamp,
-            payload_index,
-            option_chain_index,
             contract_index,
         )
         if identity in seen:
@@ -540,15 +532,13 @@ def _yfin_contract_identity(
     contract: dict[str, Any],
     side: str,
     expiration_timestamp: int,
-    payload_index: int,
-    option_chain_index: int,
     contract_index: int,
 ) -> tuple[str, str]:
     contract_symbol = contract.get("contractSymbol")
     if isinstance(contract_symbol, str) and contract_symbol.strip():
         return ("contractSymbol", contract_symbol.strip())
     strike = contract.get("strike")
-    fallback_key = f"{side}:{expiration_timestamp}:{strike!r}:{payload_index}:{option_chain_index}:{contract_index}"
+    fallback_key = f"{side}:{expiration_timestamp}:{strike!r}:{contract_index}"
     return ("position", fallback_key)
 
 
@@ -628,7 +618,11 @@ def _average_yfin_implied_volatility(contracts: list[dict[str, Any]]) -> float |
 
 
 def _safe_ratio(numerator: int, denominator: int) -> float:
-    return numerator / denominator if denominator else 0.0
+    if denominator:
+        return numerator / denominator
+    if numerator:
+        return float("inf")
+    return 0.0
 
 
 def _is_standard_monthly_expiration(expiration_date: date) -> bool:
