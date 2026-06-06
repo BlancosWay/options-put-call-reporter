@@ -26,3 +26,5 @@ pytest -q
 - Reports and raw diagnostics: `archive/YYYY-MM-DD/`.
 - SQLite history: `data/history.sqlite3`.
 - Barchart/Playwright collection code: `src/reporter/collector.py`.
+- Architecture guide: `docs/ARCHITECTURE.md`.
+- Maintenance guide: `docs/MAINTENANCE.md`.

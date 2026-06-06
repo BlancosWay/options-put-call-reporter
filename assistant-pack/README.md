@@ -24,6 +24,11 @@ Use the root `GEMINI.md` file.
 
 Paste `assistant-pack/prompts/options-report-agent.md` into assistants that do not support file-based instructions.
 
+## Deeper project context
+
+- `docs/ARCHITECTURE.md` explains runtime flow, source metadata, module responsibilities, and safe change points.
+- `docs/MAINTENANCE.md` explains local validation, protected `main`, CI, Dependabot auto-merge, and release workflow.
+
 ## Safety
 
 Treat generated reports as options-sentiment research, not financial advice. Never paste secrets into chat; Gmail App Passwords should stay in macOS Keychain via `options-put-call-report setup-email`.

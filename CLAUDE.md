@@ -12,6 +12,11 @@ Use this project as a Python CLI/package. Follow TDD for behavior changes and ru
 - Reports and raw diagnostics: `archive/YYYY-MM-DD/`.
 - History: `data/history.sqlite3`.
 
+## Reference docs
+
+- `docs/ARCHITECTURE.md` explains runtime flow, source metadata, module responsibilities, and safe change points.
+- `docs/MAINTENANCE.md` explains local validation, protected `main`, CI, Dependabot auto-merge, and release workflow.
+
 ## CI-equivalent checks
 
 Run `pytest -q` and `python -m build`.

@@ -4,6 +4,24 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 
 > Not financial advice. This project summarizes options sentiment data for research and automation. Verify all market data independently before making trading or investment decisions.
 
+## Table of contents
+
+- [Features](#features)
+- [Install from GitHub](#install-from-github)
+- [Quickstart](#quickstart)
+- [What this produces](#what-this-produces)
+- [How to read the signal](#how-to-read-the-signal)
+- [Data sources and fallback behavior](#data-sources-and-fallback-behavior)
+- [CLI command reference](#cli-command-reference)
+- [Outputs](#outputs)
+- [Email setup](#email-setup)
+- [Scheduler](#scheduler)
+- [Documentation for maintainers and agents](#documentation-for-maintainers-and-agents)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [Security and privacy](#security-and-privacy)
+- [License](#license)
+
 ## Features
 
 - Collects Barchart put/call ratio data with Playwright Chromium.
@@ -70,6 +88,51 @@ NOW AAOI
 LITE  # comments are ignored
 ```
 
+## What this produces
+
+A run creates a dated archive folder and writes a human-readable report plus raw diagnostics:
+
+```text
+archive/YYYY-MM-DD/
+|-- report.html
+|-- report.md
+|-- META-expirations.csv
+|-- META-snapshot.json
+|-- META-raw.json
+`-- META-raw.html
+```
+
+The HTML report summarizes each symbol with a monthly signal, put/call ratios, drift from prior saved runs, and the data source used for that symbol.
+
+Successful Barchart collection writes `{SYMBOL}-raw.html` and `{SYMBOL}-raw.json`. If Barchart extraction fails before fallback succeeds or the symbol fails completely, failure diagnostics are written as `{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`.
+
+## How to read the signal
+
+- **Put/call ratio:** compares put activity to call activity. Higher values are more put-heavy; lower values are more call-heavy.
+- **Monthly signal:** classifies monthly expiration rows as bullish, bearish, or neutral using the reporter's ratio thresholds.
+- **Drift:** compares the current snapshot with prior history in `data/history.sqlite3` when enough previous data exists.
+- **Data source:** each generated report discloses whether a symbol used Barchart primary data or yfin.dev fallback data.
+
+Use the report as options-sentiment research, not as a trade recommendation.
+
+## Data sources and fallback behavior
+
+Barchart is the primary source. The collector uses Playwright Chromium to load Barchart put/call pages and stores raw diagnostics in the daily archive.
+
+If Barchart collection fails for a symbol, the tool falls back to the free yfin.dev options-chain API. yfin.dev fallback can still calculate expiration-level put/call volume and open-interest ratios, but it does not provide Barchart-only top metrics such as IV Rank or IV Percentile. Fallback runs write `{SYMBOL}-yfin-raw.json` and mark the report source as `yfin.dev`.
+
+## CLI command reference
+
+| Task | Command |
+| --- | --- |
+| Run default watchlist without email | `options-put-call-report run --no-email` |
+| Run selected symbols | `options-put-call-report run --no-email META MSFT NOW` |
+| Run symbols from a file | `options-put-call-report run --no-email --symbols-file watchlist.txt` |
+| Configure Gmail email | `options-put-call-report setup-email` |
+| Run and send email | `options-put-call-report run --send-email` |
+| Install Playwright Chromium for pipx install | `python3 -m pipx run --spec playwright playwright install chromium` |
+| Install Playwright Chromium in a checkout | `python -m playwright install chromium` |
+
 ## Outputs
 
 By default, reports and raw collection artifacts are written under `archive/YYYY-MM-DD/`:
@@ -79,6 +142,7 @@ By default, reports and raw collection artifacts are written under `archive/YYYY
 - `{SYMBOL}-expirations.csv` - raw expiration table.
 - `{SYMBOL}-snapshot.json` - normalized snapshot.
 - `{SYMBOL}-raw.json` and `{SYMBOL}-raw.html` - collection diagnostics.
+- `{SYMBOL}-failure.html` and `{SYMBOL}-failure.png` - Barchart extraction failure diagnostics.
 - `{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.
 
 History is stored in `data/history.sqlite3`.
@@ -117,7 +181,14 @@ The scheduled job runs at 2:30 PM Pacific Time, which corresponds to 5:30 PM Eas
 
 The scheduled runner captures the same concise progress output in these logs.
 
-## Assistant pack
+## Documentation for maintainers and agents
+
+- `docs/ARCHITECTURE.md` explains runtime flow, source metadata, module responsibilities, and safe change points.
+- `docs/MAINTENANCE.md` explains local validation, protected `main`, CI, Dependabot auto-merge, and release checks.
+- `docs/PUBLISHING.md` explains initial GitHub publication.
+- `CONTRIBUTING.md` explains contributor expectations.
+- `SECURITY.md` explains vulnerability reporting and sensitive local files.
+- `assistant-pack/README.md` explains portable assistant instructions.
 
 This repository includes assistant instructions for maintaining and operating the tool:
 
@@ -141,11 +212,14 @@ CI runs the test suite on Python 3.11 and 3.12 and builds the package.
 
 ## Troubleshooting
 
-- If Barchart collection fails after a GitHub/pipx install, run `python3 -m pipx run --spec playwright playwright install chromium`.
-- In a development checkout, install Chromium with `python -m playwright install chromium`.
-- If a symbol fails, inspect the daily `archive/YYYY-MM-DD/` diagnostics.
-- If email fails, confirm the Gmail App Password is present in Keychain and the recipient config exists.
-- If running from a fresh GitHub install, the packaged default watchlist is used when `config/symbols.json` is absent.
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| `options-put-call-report` is not found after install | Shell has not picked up pipx's PATH update | Restart the shell or source your shell profile after `python3 -m pipx ensurepath`. |
+| Browser collection fails immediately | Playwright Chromium is missing | For pipx installs, run `python3 -m pipx run --spec playwright playwright install chromium`. In a checkout, run `python -m playwright install chromium`. |
+| Barchart collection fails for one symbol | Barchart page or network response failed | Inspect `archive/YYYY-MM-DD/{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`; if fallback succeeds, also inspect `{SYMBOL}-yfin-raw.json`. |
+| Report uses yfin.dev fallback | Barchart failed and fallback succeeded | Check the report data-source disclosure and `{SYMBOL}-yfin-raw.json`; Barchart-only IV Rank/Percentile metrics may be unavailable. |
+| Email send fails | Gmail App Password or local recipient config is missing | Run `options-put-call-report setup-email` and confirm `config/email.local.json` exists locally. |
+| Fresh install has no `config/symbols.json` | GitHub install uses packaged defaults | Run without a config file to use packaged defaults, or pass symbols in the terminal or via `--symbols-file`. |
 
 ## Security and privacy
 

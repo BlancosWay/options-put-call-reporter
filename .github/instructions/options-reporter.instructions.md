@@ -11,6 +11,8 @@ applyTo: "**/*"
 - Config: `config/symbols.json` with packaged fallback defaults.
 - Reports/diagnostics: `archive/YYYY-MM-DD/`.
 - History database: `data/history.sqlite3`.
+- Architecture guide: `docs/ARCHITECTURE.md`.
+- Maintenance guide: `docs/MAINTENANCE.md`.
 - CI-equivalent checks: `pytest -q` and `python -m build`.
 - Browser setup: `python -m playwright install chromium`.
 - Local run: `options-put-call-report run --no-email`.
