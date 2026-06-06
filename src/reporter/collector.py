@@ -62,7 +62,14 @@ async def _collect_symbol_from_barchart(
     archive_dir: Path,
 ) -> Snapshot:
     archive_dir.mkdir(parents=True, exist_ok=True)
-    async with async_playwright() as playwright:
+    playwright_manager = async_playwright()
+    try:
+        playwright = await playwright_manager.__aenter__()
+    except Exception as exc:
+        raise CollectionError(f"{symbol_config.symbol} extraction failed: {exc}") from exc
+
+    snapshot = None
+    try:
         browser = None
         context = None
         page = None
@@ -97,7 +104,6 @@ async def _collect_symbol_from_barchart(
                 _snapshot_json(snapshot),
                 encoding="utf-8",
             )
-            return snapshot
         except Exception as exc:
             if expiration_response_task is not None:
                 expiration_response_task.cancel()
@@ -120,6 +126,15 @@ async def _collect_symbol_from_barchart(
                 await context.close()
             if browser is not None:
                 await browser.close()
+    except BaseException as exc:
+        suppress_exception = await playwright_manager.__aexit__(type(exc), exc, exc.__traceback__)
+        if not suppress_exception:
+            raise
+    else:
+        await playwright_manager.__aexit__(None, None, None)
+        if snapshot is None:
+            raise CollectionError(f"{symbol_config.symbol} extraction failed: no snapshot was created")
+        return snapshot
 
 
 async def _collect_symbol_from_yfin(
