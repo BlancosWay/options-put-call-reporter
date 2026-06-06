@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from reporter.models import DriftItem, MonthlySignal, Signal, SymbolAnalysis, Thresholds
 
 
@@ -24,6 +26,12 @@ def _average_oi_ratio(signals: list[MonthlySignal]) -> float:
 
 
 def _direction(current: float, previous: float, label: str) -> str:
+    if math.isinf(current) and current > 0 and math.isinf(previous) and previous > 0:
+        return f"{label} remained extremely put-heavy"
+    if math.isinf(current) and current > 0 and math.isfinite(previous):
+        return f"{label} moved to an extremely put-heavy reading"
+    if math.isfinite(current) and math.isinf(previous) and previous > 0:
+        return f"{label} moved back from an extremely put-heavy reading"
     delta = current - previous
     if abs(delta) < 0.05:
         return f"{label} was mostly unchanged"

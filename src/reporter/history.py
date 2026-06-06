@@ -7,7 +7,13 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from reporter.models import ExpirationRow, Snapshot, TopMetrics
+from reporter.models import (
+    DataSource,
+    ExpirationRow,
+    Snapshot,
+    TopMetrics,
+    default_barchart_source,
+)
 
 
 class HistoryStore:
@@ -42,15 +48,24 @@ class HistoryStore:
                 ON snapshots(symbol, captured_at)
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(snapshots)").fetchall()
+            }
+            if "data_source_json" not in columns:
+                connection.execute("ALTER TABLE snapshots ADD COLUMN data_source_json TEXT")
 
     def save_snapshot(self, snapshot: Snapshot) -> None:
         rows_json = json.dumps([self._row_to_json(row) for row in snapshot.rows])
         metrics_json = json.dumps(asdict(snapshot.metrics))
+        data_source_json = json.dumps(asdict(snapshot.data_source))
         with self._connect() as connection:
             connection.execute(
                 """
-                INSERT OR REPLACE INTO snapshots(symbol, url, captured_at, metrics_json, rows_json)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO snapshots(
+                    symbol, url, captured_at, metrics_json, rows_json, data_source_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     snapshot.symbol.upper(),
@@ -58,6 +73,7 @@ class HistoryStore:
                     snapshot.captured_at.isoformat(),
                     metrics_json,
                     rows_json,
+                    data_source_json,
                 ),
             )
 
@@ -120,6 +136,12 @@ class HistoryStore:
     def _snapshot_from_row(row: sqlite3.Row) -> Snapshot:
         metrics_data = json.loads(row["metrics_json"])
         rows_data = json.loads(row["rows_json"])
+        data_source_json = row["data_source_json"]
+        data_source = (
+            DataSource(**json.loads(data_source_json))
+            if data_source_json
+            else default_barchart_source()
+        )
         return Snapshot(
             symbol=row["symbol"],
             url=row["url"],
@@ -134,4 +156,5 @@ class HistoryStore:
                 )
                 for item in rows_data
             ],
+            data_source=data_source,
         )

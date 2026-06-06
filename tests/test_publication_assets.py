@@ -62,6 +62,9 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Not financial advice",
         "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
         "After `ensurepath`, restart your shell",
+        "Falls back to yfin.dev options-chain data when Barchart collection fails.",
+        "Reports disclose the data source used for each symbol.",
+        "`{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
     ]:
         assert text in readme
 
@@ -203,3 +206,26 @@ def test_dependabot_updates_actions_and_python_dependencies() -> None:
         "interval: \"weekly\"",
     ]:
         assert text in dependabot
+
+
+def test_dependabot_auto_merge_only_allows_patch_and_minor_updates() -> None:
+    workflow_path = ROOT / ".github/workflows/dependabot-auto-merge.yml"
+
+    assert workflow_path.exists()
+
+    workflow = workflow_path.read_text(encoding="utf-8")
+
+    for text in [
+        "pull_request_target:",
+        "github.actor == 'dependabot[bot]'",
+        "!github.event.pull_request.draft",
+        "contents: write",
+        "pull-requests: write",
+        "dependabot/fetch-metadata@v2",
+        "version-update:semver-patch",
+        "version-update:semver-minor",
+        "gh pr merge --auto --squash \"$PR_URL\"",
+    ]:
+        assert text in workflow
+
+    assert "version-update:semver-major" not in workflow
