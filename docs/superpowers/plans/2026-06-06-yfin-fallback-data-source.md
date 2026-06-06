@@ -20,12 +20,12 @@
 
 ## Task 1: Snapshot source metadata
 
-- [ ] Write failing tests that assert a `Snapshot` can carry `DataSource` metadata and that `HistoryStore` round-trips it.
-- [ ] Add `DataSource` to `models.py` with fields `name`, `url`, `is_fallback`, and `note`.
-- [ ] Add `data_source` to `Snapshot` with a default Barchart value so existing tests and old history rows keep working.
-- [ ] Add `data_source_json` to the SQLite snapshots table when missing.
-- [ ] Save and load `data_source_json`, defaulting missing values to the Barchart source.
-- [ ] Run `pytest tests/test_history.py -q`.
+- [x] Write failing tests that assert a `Snapshot` can carry `DataSource` metadata and that `HistoryStore` round-trips it.
+- [x] Add `DataSource` to `models.py` with fields `name`, `url`, `is_fallback`, and `note`.
+- [x] Add `data_source` to `Snapshot` with a default Barchart value so existing tests and old history rows keep working.
+- [x] Add `data_source_json` to the SQLite snapshots table when missing.
+- [x] Save and load `data_source_json`, defaulting missing values to the Barchart source.
+- [x] Run `pytest tests/test_history.py -q`.
 
 ## Task 2: yfin fallback collector
 
@@ -40,12 +40,12 @@
 
 ## Task 3: Source disclosure in generated files
 
-- [ ] Write failing report tests for source disclosure in HTML, Markdown, and raw CSV.
-- [ ] Add a Source column to the summary HTML table.
-- [ ] Add a data-source paragraph to each successful symbol card.
-- [ ] Add a `### Data Source` section to each successful Markdown symbol section.
-- [ ] Add `data_source_name`, `data_source_url`, `data_source_is_fallback`, and `data_source_note` columns to raw CSV rows.
-- [ ] Run `pytest tests/test_reporting.py -q`.
+- [x] Write failing report tests for source disclosure in HTML, Markdown, and raw CSV.
+- [x] Add a Source column to the summary HTML table.
+- [x] Add a data-source paragraph to each successful symbol card.
+- [x] Add a `### Data Source` section to each successful Markdown symbol section.
+- [x] Add `data_source_name`, `data_source_url`, `data_source_is_fallback`, and `data_source_note` columns to raw CSV rows.
+- [x] Run `pytest tests/test_reporting.py -q`.
 
 ## Task 4: Final verification and publish
 

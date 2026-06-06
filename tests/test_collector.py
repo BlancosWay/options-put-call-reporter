@@ -749,7 +749,7 @@ async def test_collect_symbol_falls_back_to_yfin_when_barchart_and_playwright_ma
 
 
 @pytest.mark.asyncio
-async def test_collect_symbol_does_not_fall_back_when_cleanup_fails_after_barchart_success(
+async def test_collect_symbol_falls_back_to_yfin_when_cleanup_fails_after_barchart_success(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -763,18 +763,30 @@ async def test_collect_symbol_does_not_fall_back_when_cleanup_fails_after_barcha
 
     async def fake_fetch_yfin_json(symbol: str, expiration: int | None = None) -> dict[str, Any]:
         yfin_calls.append(symbol)
-        return _yfin_payload([], [])
+        assert expiration is None
+        return _yfin_payload(
+            [1781740800],
+            [
+                {
+                    "expirationDate": 1781740800,
+                    "calls": [{"volume": 1, "openInterest": 2, "impliedVolatility": 0.25}],
+                    "puts": [{"volume": 3, "openInterest": 4, "impliedVolatility": 0.35}],
+                }
+            ],
+        )
 
     monkeypatch.setattr(collector, "_fetch_yfin_json", fake_fetch_yfin_json)
 
-    with pytest.raises(RuntimeError, match="context close failed"):
-        await collect_symbol(
-            SymbolConfig("MSFT", "https://example.test/msft"),
-            captured_at=datetime(2026, 6, 2, 21, 30),
-            archive_dir=tmp_path,
-        )
+    snapshot = await collect_symbol(
+        SymbolConfig("MSFT", "https://example.test/msft"),
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        archive_dir=tmp_path,
+    )
 
-    assert yfin_calls == []
+    assert yfin_calls == ["MSFT"]
+    assert snapshot.data_source.is_fallback is True
+    assert snapshot.data_source.note == "Fallback after Barchart failed: context close failed"
+    assert snapshot.rows[0].put_volume == 3
 
 
 @pytest.mark.asyncio

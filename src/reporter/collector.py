@@ -138,7 +138,7 @@ async def _collect_symbol_from_barchart(
                     if cleanup_error is None:
                         cleanup_error = exc
             if cleanup_error is not None:
-                raise cleanup_error
+                raise CollectionError(f"{symbol_config.symbol} extraction failed: {cleanup_error}") from cleanup_error
     except BaseException as exc:
         try:
             suppress_exception = await playwright_manager.__aexit__(type(exc), exc, exc.__traceback__)
@@ -149,7 +149,10 @@ async def _collect_symbol_from_barchart(
         if not suppress_exception:
             raise
     else:
-        await playwright_manager.__aexit__(None, None, None)
+        try:
+            await playwright_manager.__aexit__(None, None, None)
+        except Exception as exc:
+            raise CollectionError(f"{symbol_config.symbol} extraction failed: {exc}") from exc
         if snapshot is None:
             raise CollectionError(f"{symbol_config.symbol} extraction failed: no snapshot was created")
         return snapshot
