@@ -4,6 +4,7 @@ import csv
 from datetime import datetime
 from html import escape
 from pathlib import Path
+from urllib.parse import urlparse
 
 from reporter.models import ReportBundle, Signal, SymbolReport
 
@@ -76,6 +77,50 @@ def _signal_class(signal: Signal | None) -> str:
 
 def _signal_badge(label: str, signal: Signal | None = None) -> str:
     return f'<span class="signal-badge signal-badge--{_signal_class(signal)}">{escape(label)}</span>'
+
+
+def _source_label(report: SymbolReport) -> str:
+    if report.snapshot is None:
+        return "—"
+    source = report.snapshot.data_source
+    suffix = " (fallback)" if source.is_fallback else ""
+    return f"{source.name}{suffix}"
+
+
+def _is_http_url(url: str) -> bool:
+    try:
+        return urlparse(url).scheme.lower() in {"http", "https"}
+    except ValueError:
+        return False
+
+
+def _source_html(report: SymbolReport) -> str:
+    if report.snapshot is None:
+        return "—"
+    source = report.snapshot.data_source
+    label = _source_label(report)
+    escaped_label = escape(label)
+    if source.url and _is_http_url(source.url):
+        source_text = f'<a href="{escape(source.url, quote=True)}">{escaped_label}</a>'
+    else:
+        url_text = f" — {escape(source.url)}" if source.url else ""
+        source_text = f"{escaped_label}{url_text}"
+    note = f" — {escape(source.note)}" if source.note else ""
+    return f"Data source: {source_text}{note}"
+
+
+def _source_markdown(report: SymbolReport) -> list[str]:
+    if report.snapshot is None:
+        return ["No data source available."]
+    source = report.snapshot.data_source
+    rows = [
+        f"- Name: {source.name}",
+        f"- URL: {source.url}",
+        f"- Fallback: {'Yes' if source.is_fallback else 'No'}",
+    ]
+    if source.note:
+        rows.append(f"- Note: {source.note}")
+    return rows
 
 
 def _primary_signal(report: SymbolReport) -> Signal | None:
@@ -252,7 +297,12 @@ def _raw_csv(report: SymbolReport, archive_dir: Path) -> Path | None:
             "put_call_open_interest_ratio",
             "implied_volatility",
             "is_monthly",
+            "data_source_name",
+            "data_source_url",
+            "data_source_is_fallback",
+            "data_source_note",
         ])
+        source = report.snapshot.data_source
         for row in report.snapshot.rows:
             writer.writerow([
                 row.expiration_label,
@@ -268,13 +318,17 @@ def _raw_csv(report: SymbolReport, archive_dir: Path) -> Path | None:
                 row.put_call_open_interest_ratio,
                 row.implied_volatility,
                 row.is_monthly,
+                source.name,
+                source.url,
+                source.is_fallback,
+                source.note or "",
             ])
     return path
 
 
 def _summary_table_html(symbol_reports: list[SymbolReport], csv_paths: dict[str, Path]) -> str:
     rows = [
-        '<table class="summary-table"><tr><th>Symbol</th><th>Status</th><th>Signal</th><th>Details</th><th>Raw CSV</th></tr>'
+        '<table class="summary-table"><tr><th>Symbol</th><th>Status</th><th>Signal</th><th>Source</th><th>Details</th><th>Raw CSV</th></tr>'
     ]
     for report in symbol_reports:
         symbol = escape(report.symbol)
@@ -282,7 +336,7 @@ def _summary_table_html(symbol_reports: list[SymbolReport], csv_paths: dict[str,
             rows.append(
                 "<tr>"
                 f"<td><strong>{symbol}</strong></td><td>{_signal_badge('Failed', Signal.FAILED)}</td>"
-                f"<td>{_signal_badge('Unavailable')}</td><td>{escape(report.error)}</td><td>—</td>"
+                f"<td>{_signal_badge('Unavailable')}</td><td>—</td><td>{escape(report.error)}</td><td>—</td>"
                 "</tr>"
             )
             continue
@@ -294,7 +348,8 @@ def _summary_table_html(symbol_reports: list[SymbolReport], csv_paths: dict[str,
         rows.append(
             "<tr>"
             f"<td><strong>{symbol}</strong></td><td>{_signal_badge('Success', Signal.BULLISH)}</td>"
-            f"<td>{_signal_badge(signal_label, signal)}</td><td>{escape(commentary)}</td><td>{csv_link}</td>"
+            f"<td>{_signal_badge(signal_label, signal)}</td><td>{escape(_source_label(report))}</td>"
+            f"<td>{escape(commentary)}</td><td>{csv_link}</td>"
             "</tr>"
         )
     rows.append("</table>")
@@ -331,7 +386,7 @@ def _symbol_card_html(report: SymbolReport, csv_path: Path | None) -> str:
     return "\n".join([
         '<section class="symbol-card">',
         '<div class="symbol-card__header">',
-        f'<div class="symbol-card__title"><h2>{symbol}</h2><p>{escape(commentary)}</p>{csv_link}</div>',
+        f'<div class="symbol-card__title"><h2>{symbol}</h2><p>{escape(commentary)}</p><p>{_source_html(report)}</p>{csv_link}</div>',
         f'<div class="symbol-card__signal">{_signal_badge(signal_label, signal)}</div>',
         "</div>",
         "<h3>Metrics</h3>",
@@ -386,7 +441,9 @@ def render_reports(generated_at: datetime, symbol_reports: list[SymbolReport], a
         if report.error:
             markdown_sections.extend([f"## {report.symbol}", f"Failed: {report.error}", ""])
             continue
-        markdown_sections.extend([f"## {report.symbol}", "", "### Metrics"])
+        markdown_sections.extend([f"## {report.symbol}", "", "### Data Source"])
+        markdown_sections.extend(_source_markdown(report))
+        markdown_sections.extend(["", "### Metrics"])
         markdown_sections.extend(_metrics_markdown(report))
         markdown_sections.extend(["", "### Commentary", report.analysis.commentary if report.analysis else ""])
         markdown_sections.extend(["", "### Monthly Signals"])
