@@ -55,6 +55,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "options-put-call-report setup-email",
         "launchd",
         "Not financial advice",
+        "Planned publishing assets include assistant instructions",
+        "After `ensurepath`, restart your shell",
     ]:
         assert text in readme
 
@@ -64,6 +66,8 @@ def test_public_docs_do_not_claim_future_assets_exist_before_they_are_added() ->
 
     assert "See `assistant-pack/README.md`" not in readme
     assert "CI runs the test suite" not in readme
+    assert "Ships assistant instructions" not in readme
+    assert "This publishing branch adds assistant instructions" not in readme
 
 
 def test_publishing_docs_include_existing_origin_safe_commands() -> None:

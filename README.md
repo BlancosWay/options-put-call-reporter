@@ -12,7 +12,7 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 - Supports default symbols, terminal symbols, or a plain-text symbol file.
 - Sends Gmail reports using a macOS Keychain-stored app password.
 - Includes launchd scheduling scripts for local daily runs on macOS.
-- Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
+- Planned publishing assets include assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
 
 ## Install from GitHub
 
@@ -22,6 +22,8 @@ python3 -m pipx ensurepath
 python3 -m pipx install git+https://github.com/srinadel/options-put-call-reporter.git
 python3 -m pipx run --spec playwright playwright install chromium
 ```
+
+After `ensurepath`, restart your shell or source your shell profile before running `options-put-call-report`.
 
 For development:
 
@@ -114,7 +116,7 @@ The scheduled runner captures the same concise progress output in these logs.
 
 ## Assistant pack
 
-This publishing branch adds assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini. The assistant-pack files are part of the full publishing release checklist.
+Planned publishing assets include assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini. The assistant-pack files are part of the full publishing release checklist and are added in a later task on this branch.
 
 ## Development
 
@@ -124,7 +126,7 @@ pytest -q
 python -m build
 ```
 
-The publishing release checklist includes GitHub Actions CI for Python 3.11 and 3.12.
+The publishing release checklist adds GitHub Actions CI for Python 3.11 and 3.12.
 
 ## Troubleshooting
 
