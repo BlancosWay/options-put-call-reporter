@@ -2,6 +2,7 @@ from email.message import EmailMessage
 from pathlib import Path
 import smtplib
 import subprocess
+import traceback
 
 import pytest
 
@@ -184,3 +185,65 @@ def test_send_email_report_failure_includes_smtp_stage_and_safe_diagnostics(
     assert "SMTPAuthenticationError" in message
     assert "Username and Password not accepted" in message
     assert "super-secret-app-password" not in message
+
+
+@pytest.mark.parametrize(
+    ("failure_stage", "expected_stage"),
+    [
+        ("connect", "connect"),
+        ("starttls", "starttls"),
+        ("login", "login"),
+        ("send", "send"),
+    ],
+)
+def test_send_email_report_failure_diagnostics_cover_all_smtp_stages_without_leaking_secret(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failure_stage: str,
+    expected_stage: str,
+) -> None:
+    html_path = tmp_path / "report.html"
+    html_path.write_text("<h1>Report</h1>", encoding="utf-8")
+    app_password = "super-secret-app-password"
+
+    class FakeSMTP:
+        def __init__(self, host: str, port: int, *, timeout: float) -> None:
+            if failure_stage == "connect":
+                raise OSError(f"connect failed with {app_password}")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def starttls(self, *, context: object) -> None:
+            if failure_stage == "starttls":
+                raise smtplib.SMTPException(f"tls failed with {app_password}")
+
+        def login(self, user: str, password: str) -> None:
+            if failure_stage == "login":
+                raise smtplib.SMTPAuthenticationError(535, f"login failed with {password}".encode())
+
+        def send_message(self, message: EmailMessage) -> None:
+            if failure_stage == "send":
+                raise smtplib.SMTPException(f"send failed with {app_password}")
+
+    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+
+    with pytest.raises(EmailError) as exc:
+        send_email_report(
+            email_config=EmailConfig("sender@gmail.com", "recipient@gmail.com"),
+            smtp_host="smtp.gmail.com",
+            smtp_port=587,
+            app_password=app_password,
+            subject="Daily report",
+            html_path=html_path,
+        )
+
+    traceback_text = "".join(traceback.format_exception(exc.value))
+    assert f"stage={expected_stage}" in str(exc.value)
+    assert app_password not in str(exc.value)
+    assert app_password not in traceback_text
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
