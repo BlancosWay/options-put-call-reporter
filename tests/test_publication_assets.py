@@ -86,6 +86,10 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
     ]:
         assert text in readme
 
+    security = _read("SECURITY.md")
+    assert "data/history.sqlite3" not in security
+    assert "data/" in security
+
 
 def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
     architecture = _read("docs/ARCHITECTURE.md")
@@ -266,6 +270,9 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "stage=send",
     ]:
         assert text in combined
+
+    assert "Resend API keys belong in macOS Keychain" in _read("AGENTS.md")
+    assert "Resend API keys should stay in macOS Keychain" in _read("assistant-pack/README.md")
 
     for native_file in ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"]:
         content = _read(native_file)
