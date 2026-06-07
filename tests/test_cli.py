@@ -480,7 +480,7 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
 
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "Resend API key stored in macOS Keychain for reports@example.com." in captured.out
+    assert "Resend API key stored in the system keyring for reports@example.com." in captured.out
     assert "Email config written to" in captured.out
     assert input_prompts == ["Resend sender address: ", "Report recipient address: "]
     assert getpass_prompts == ["Resend API key: "]
