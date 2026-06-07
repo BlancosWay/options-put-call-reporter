@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tomllib
+import subprocess
 from pathlib import Path
 
 
@@ -203,7 +204,24 @@ def test_superpowers_working_docs_are_not_public_repo_assets() -> None:
     gitignore = _read(".gitignore")
 
     assert "docs/superpowers/" in gitignore
-    assert not (ROOT / "docs/superpowers").exists()
+
+    tracked = subprocess.run(
+        ["git", "ls-files", "docs/superpowers"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    ignored = subprocess.run(
+        ["git", "check-ignore", "docs/superpowers/example.md"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert tracked.stdout == ""
+    assert ignored.stdout.strip() == "docs/superpowers/example.md"
 
 
 def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
