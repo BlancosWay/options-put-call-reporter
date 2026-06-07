@@ -30,24 +30,44 @@ def test_get_password_calls_security_find(monkeypatch: pytest.MonkeyPatch) -> No
     assert calls[0][:3] == ["security", "find-generic-password", "-a"]
 
 
-def test_set_password_calls_security_add(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[list[str]] = []
-    inputs: list[str] = []
+def test_set_password_adds_secret_through_security_framework(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str, str]] = []
 
-    def fake_run(args, check, capture_output, text, input=None):
-        calls.append(args)
-        inputs.append(input)
-        return Completed()
+    def fake_add(service: str, account: str, password: str) -> int:
+        calls.append((service, account, password))
+        return 0
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    def fake_update(service: str, account: str, password: str) -> int:
+        raise AssertionError("update should not run for a new Keychain item")
 
-    secret = "secret"
-    set_password("service", "user@example.com", secret)
-    assert "add-generic-password" in calls[0]
-    assert "-U" in calls[0]
-    assert calls[0][-1] == "-w"
-    assert secret not in calls[0]
-    assert inputs == [f"{secret}\n{secret}\n"]
+    monkeypatch.setattr("reporter.keychain._add_generic_password", fake_add)
+    monkeypatch.setattr("reporter.keychain._update_generic_password", fake_update)
+
+    set_password("service", "user@example.com", "re_secret")
+
+    assert calls == [("service", "user@example.com", "re_secret")]
+
+
+def test_set_password_updates_existing_keychain_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str, str, str]] = []
+
+    def fake_add(service: str, account: str, password: str) -> int:
+        calls.append(("add", service, account, password))
+        return -25299
+
+    def fake_update(service: str, account: str, password: str) -> int:
+        calls.append(("update", service, account, password))
+        return 0
+
+    monkeypatch.setattr("reporter.keychain._add_generic_password", fake_add)
+    monkeypatch.setattr("reporter.keychain._update_generic_password", fake_update)
+
+    set_password("service", "user@example.com", "re_secret")
+
+    assert calls == [
+        ("add", "service", "user@example.com", "re_secret"),
+        ("update", "service", "user@example.com", "re_secret"),
+    ]
 
 
 def test_set_password_rejects_empty_email_api_key() -> None:
@@ -84,11 +104,8 @@ def test_get_password_raises_email_api_key_error_for_empty_secret(monkeypatch: p
 def test_set_password_raises_without_leaking_secret_in_exception_chain(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "email-api-key-secret"
 
-    def fake_run(args, check, capture_output, text, input=None):
-        assert secret not in args
-        raise subprocess.CalledProcessError(returncode=1, cmd=args)
-
-    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("reporter.keychain._add_generic_password", lambda service, account, password: -50)
+    monkeypatch.setattr("reporter.keychain._update_generic_password", lambda service, account, password: 0)
 
     with pytest.raises(KeychainError) as exc:
         set_password("service", "user@example.com", secret)
@@ -99,14 +116,12 @@ def test_set_password_raises_without_leaking_secret_in_exception_chain(monkeypat
 
 
 def test_set_password_failure_mentions_email_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_run(args, check, capture_output, text, input=None):
-        raise subprocess.CalledProcessError(returncode=1, cmd=args)
-
-    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("reporter.keychain._add_generic_password", lambda service, account, password: -50)
+    monkeypatch.setattr("reporter.keychain._update_generic_password", lambda service, account, password: 0)
 
     with pytest.raises(
         KeychainError,
-        match="Unable to store email API key in Keychain for account 'reports@example.com'",
+        match=r"Unable to store email API key in Keychain for account 'reports@example.com' \(status=-50\)",
     ) as exc:
         set_password("service", "reports@example.com", "re_secret")
 
