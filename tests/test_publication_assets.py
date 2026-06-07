@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tomllib
+import subprocess
 from pathlib import Path
 
 
@@ -160,8 +161,6 @@ def test_publishing_docs_include_existing_origin_safe_commands() -> None:
 def test_publication_guidance_uses_safe_push_commands() -> None:
     publication_paths = [
         "docs/PUBLISHING.md",
-        "docs/superpowers/specs/2026-06-05-github-publishing-agent-distribution-design.md",
-        "docs/superpowers/plans/2026-06-06-github-publishing-agent-distribution.md",
     ]
 
     for path in publication_paths:
@@ -176,8 +175,6 @@ def test_publication_assets_target_blancosway_not_prior_owner() -> None:
         "pyproject.toml",
         "README.md",
         "docs/PUBLISHING.md",
-        "docs/superpowers/specs/2026-06-05-github-publishing-agent-distribution-design.md",
-        "docs/superpowers/plans/2026-06-06-github-publishing-agent-distribution.md",
     ]
 
     for path in publication_paths:
@@ -201,6 +198,30 @@ def test_gitignore_covers_public_repo_runtime_and_build_artifacts() -> None:
         ".env",
     ]:
         assert pattern in gitignore
+
+
+def test_superpowers_working_docs_are_not_public_repo_assets() -> None:
+    gitignore = _read(".gitignore")
+
+    assert "docs/superpowers/" in gitignore
+
+    tracked = subprocess.run(
+        ["git", "ls-files", "docs/superpowers"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    ignored = subprocess.run(
+        ["git", "check-ignore", "docs/superpowers/example.md"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert tracked.stdout == ""
+    assert ignored.stdout.strip() == "docs/superpowers/example.md"
 
 
 def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
