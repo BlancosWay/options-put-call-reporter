@@ -24,3 +24,4 @@ dist/
 build/
 *.egg-info/
 pip-wheel-metadata/
+docs/superpowers/
