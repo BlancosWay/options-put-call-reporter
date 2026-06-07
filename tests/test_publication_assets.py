@@ -73,7 +73,7 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "After `ensurepath`, restart your shell",
         "Falls back to yfin.dev options-chain data when Barchart collection fails.",
         "Reports disclose the data source used for each symbol.",
-        "`{SYMBOL}-yfin-raw.json` - fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
+        "`{SYMBOL}-yfin-raw.json` | Fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
         "## Table of contents",
         "## What this produces",
         "## How to read the signal",
