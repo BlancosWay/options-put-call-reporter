@@ -61,6 +61,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "options-put-call-report run --no-email",
         "options-put-call-report run --no-email META MSFT NOW",
         "options-put-call-report setup-email",
+        "Re-run `options-put-call-report setup-email`",
+        "Email failures include SMTP stage diagnostics like `stage=login`",
         "launchd",
         "Not financial advice",
         "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
@@ -257,6 +259,8 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "Gemini",
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
+        "Re-run `options-put-call-report setup-email`",
+        "stage=login",
     ]:
         assert text in combined
 

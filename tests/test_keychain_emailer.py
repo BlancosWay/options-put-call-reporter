@@ -1,10 +1,12 @@
 from email.message import EmailMessage
 from pathlib import Path
+import smtplib
 import subprocess
+import traceback
 
 import pytest
 
-from reporter.emailer import send_email_report
+from reporter.emailer import EmailError, send_email_report
 from reporter.keychain import KeychainError, get_password, set_password
 from reporter.models import EmailConfig
 
@@ -44,7 +46,7 @@ def test_set_password_calls_security_add(monkeypatch: pytest.MonkeyPatch) -> Non
     assert "-U" in calls[0]
     assert calls[0][-1] == "-w"
     assert secret not in calls[0]
-    assert inputs == [f"{secret}\n"]
+    assert inputs == [f"{secret}\n{secret}\n"]
 
 
 def test_get_password_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -135,3 +137,113 @@ def test_send_email_report_uses_tls_and_login(monkeypatch: pytest.MonkeyPatch, t
     html_body = message.get_body(preferencelist=("html",))
     assert html_body is not None
     assert "<h1>Report</h1>" in html_body.get_content()
+
+
+def test_send_email_report_failure_includes_smtp_stage_and_safe_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    html_path = tmp_path / "report.html"
+    html_path.write_text("<h1>Report</h1>", encoding="utf-8")
+
+    class FakeSMTP:
+        def __init__(self, host: str, port: int, *, timeout: float) -> None:
+            self.host = host
+            self.port = port
+            self.timeout = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def starttls(self, *, context: object) -> None:
+            return None
+
+        def login(self, user: str, password: str) -> None:
+            raise smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
+
+    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+
+    with pytest.raises(EmailError) as exc:
+        send_email_report(
+            email_config=EmailConfig("sender@gmail.com", "recipient@gmail.com"),
+            smtp_host="smtp.gmail.com",
+            smtp_port=587,
+            app_password="super-secret-app-password",
+            subject="Daily report",
+            html_path=html_path,
+        )
+
+    message = str(exc.value)
+    assert "Failed to send report email to recipient@gmail.com" in message
+    assert "stage=login" in message
+    assert "smtp=smtp.gmail.com:587" in message
+    assert "from=sender@gmail.com" in message
+    assert "to=recipient@gmail.com" in message
+    assert "SMTPAuthenticationError" in message
+    assert "Username and Password not accepted" in message
+    assert "super-secret-app-password" not in message
+
+
+@pytest.mark.parametrize(
+    ("failure_stage", "expected_stage"),
+    [
+        ("connect", "connect"),
+        ("starttls", "starttls"),
+        ("login", "login"),
+        ("send", "send"),
+    ],
+)
+def test_send_email_report_failure_diagnostics_cover_all_smtp_stages_without_leaking_secret(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failure_stage: str,
+    expected_stage: str,
+) -> None:
+    html_path = tmp_path / "report.html"
+    html_path.write_text("<h1>Report</h1>", encoding="utf-8")
+    app_password = "super-secret-app-password"
+
+    class FakeSMTP:
+        def __init__(self, host: str, port: int, *, timeout: float) -> None:
+            if failure_stage == "connect":
+                raise OSError(f"connect failed with {app_password}")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def starttls(self, *, context: object) -> None:
+            if failure_stage == "starttls":
+                raise smtplib.SMTPException(f"tls failed with {app_password}")
+
+        def login(self, user: str, password: str) -> None:
+            if failure_stage == "login":
+                raise smtplib.SMTPAuthenticationError(535, f"login failed with {password}".encode())
+
+        def send_message(self, message: EmailMessage) -> None:
+            if failure_stage == "send":
+                raise smtplib.SMTPException(f"send failed with {app_password}")
+
+    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+
+    with pytest.raises(EmailError) as exc:
+        send_email_report(
+            email_config=EmailConfig("sender@gmail.com", "recipient@gmail.com"),
+            smtp_host="smtp.gmail.com",
+            smtp_port=587,
+            app_password=app_password,
+            subject="Daily report",
+            html_path=html_path,
+        )
+
+    traceback_text = "".join(traceback.format_exception(exc.value))
+    assert f"stage={expected_stage}" in str(exc.value)
+    assert app_password not in str(exc.value)
+    assert app_password not in traceback_text
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None

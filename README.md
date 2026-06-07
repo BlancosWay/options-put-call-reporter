@@ -158,6 +158,8 @@ options-put-call-report run --send-email
 
 The local email config is written to `config/email.local.json`, which is intentionally ignored by git.
 
+If email was configured with an older version and Gmail login fails, re-run `options-put-call-report setup-email` so the app password is stored correctly in Keychain. Email failures include SMTP stage diagnostics like `stage=login`, the SMTP host/port, sender, recipient, and the safe exception type/message; the Gmail App Password is redacted.
+
 ## Scheduler
 
 Before installing the scheduler, confirm that a manual email run succeeds:
@@ -218,7 +220,7 @@ CI runs the test suite on Python 3.11 and 3.12 and builds the package.
 | Browser collection fails immediately | Playwright Chromium is missing | For pipx installs, run `python3 -m pipx run --spec playwright playwright install chromium`. In a checkout, run `python -m playwright install chromium`. |
 | Barchart collection fails for one symbol | Barchart page or network response failed | Inspect `archive/YYYY-MM-DD/{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`; if fallback succeeds, also inspect `{SYMBOL}-yfin-raw.json`. |
 | Report uses yfin.dev fallback | Barchart failed and fallback succeeded | Check the report data-source disclosure and `{SYMBOL}-yfin-raw.json`; Barchart-only IV Rank/Percentile metrics may be unavailable. |
-| Email send fails | Gmail App Password or local recipient config is missing | Run `options-put-call-report setup-email` and confirm `config/email.local.json` exists locally. |
+| Email send fails | Gmail App Password, local recipient config, or Gmail SMTP authentication is invalid | Re-run `options-put-call-report setup-email`, confirm `config/email.local.json` exists locally, and inspect the SMTP stage in the error, for example `stage=login` for Gmail authentication failures. |
 | Fresh install has no `config/symbols.json` | GitHub install uses packaged defaults | Run without a config file to use packaged defaults, or pass symbols in the terminal or via `--symbols-file`. |
 
 ## Security and privacy
