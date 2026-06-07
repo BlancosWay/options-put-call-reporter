@@ -4,6 +4,7 @@ from pathlib import Path
 
 from reporter.cli import main
 from reporter.history import HistoryStore
+from reporter.keychain import KeychainError
 from reporter.models import EmailConfig, ExpirationRow, Snapshot, SymbolConfig, TopMetrics
 
 
@@ -537,6 +538,7 @@ def test_setup_email_prints_clear_keychain_error_without_traceback(monkeypatch, 
         raise RuntimeError(f"backend denied access to {password}")
 
     monkeypatch.setattr("reporter.keychain.keyring.set_password", fake_set_password)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: None)
 
     exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
 
@@ -547,6 +549,130 @@ def test_setup_email_prints_clear_keychain_error_without_traceback(monkeypatch, 
     assert "re_secret" not in captured.err
     assert "Traceback" not in captured.err
     assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_reuses_matching_existing_key_when_keyring_rewrite_fails(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "symbols.json"
+    email_config_path = tmp_path / "email.local.json"
+    _config(config_path)
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+    monkeypatch.setattr(
+        "reporter.cli.set_password",
+        lambda service, account, password: (_ for _ in ()).throw(
+            KeychainError("Unable to store email API key. Keyring error: PasswordSetError: (-25244, 'Unknown Error')")
+        ),
+    )
+    monkeypatch.setattr("reporter.cli.get_system_keyring_password", lambda service, account: "re_secret")
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(email_config_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Existing matching Resend API key is already available in the system keyring for reports@example.com." in captured.out
+    assert "Email config written to" in captured.out
+    assert captured.err == ""
+    email_config = json.loads(email_config_path.read_text(encoding="utf-8"))
+    assert email_config == {"from_email": "reports@example.com", "to_email": "recipient@example.com"}
+
+
+def test_setup_email_rejects_different_existing_key_when_keyring_rewrite_fails(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "symbols.json"
+    email_config_path = tmp_path / "email.local.json"
+    _config(config_path)
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+    monkeypatch.setattr(
+        "reporter.cli.set_password",
+        lambda service, account, password: (_ for _ in ()).throw(
+            KeychainError("Unable to store email API key. Keyring error: PasswordSetError: (-25244, 'Unknown Error')")
+        ),
+    )
+    monkeypatch.setattr("reporter.cli.get_system_keyring_password", lambda service, account: "re_different_secret")
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(email_config_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Keyring error: PasswordSetError: (-25244, 'Unknown Error')" in captured.err
+    assert "re_secret" not in captured.err
+    assert "re_different_secret" not in captured.err
+    assert not email_config_path.exists()
+
+
+def test_setup_email_does_not_treat_env_key_as_existing_keyring_entry(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "symbols.json"
+    email_config_path = tmp_path / "email.local.json"
+    _config(config_path)
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_secret")
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+
+    def fake_set_password(service: str, account: str, password: str) -> None:
+        raise RuntimeError(f"backend denied access to {password}")
+
+    monkeypatch.setattr("reporter.keychain.keyring.set_password", fake_set_password)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: None)
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(email_config_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Keyring error: RuntimeError: backend denied access to <secret omitted>" in captured.err
+    assert "re_secret" not in captured.err
+    assert not email_config_path.exists()
+
+
+def test_setup_email_does_not_treat_key_file_as_existing_keyring_entry(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "symbols.json"
+    email_config_path = tmp_path / "email.local.json"
+    secret_file = tmp_path / "resend-key"
+    _config(config_path)
+    secret_file.write_text("re_secret\n", encoding="utf-8")
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY_FILE", str(secret_file))
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+
+    def fake_set_password(service: str, account: str, password: str) -> None:
+        raise RuntimeError(f"backend denied access to {password}")
+
+    monkeypatch.setattr("reporter.keychain.keyring.set_password", fake_set_password)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: None)
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(email_config_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Keyring error: RuntimeError: backend denied access to <secret omitted>" in captured.err
+    assert "re_secret" not in captured.err
+    assert str(secret_file) not in captured.err
+    assert not email_config_path.exists()
 
 
 def test_setup_email_prints_clear_config_write_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
