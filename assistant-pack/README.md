@@ -31,7 +31,7 @@ Paste `assistant-pack/prompts/options-report-agent.md` into assistants that do n
 
 ## Safety
 
-Treat generated reports as options-sentiment research, not financial advice. Never paste secrets into chat; Resend API keys should stay in macOS Keychain via `options-put-call-report setup-email`.
+Treat generated reports as options-sentiment research, not financial advice. Never paste secrets into chat; Resend API keys should stay in macOS Keychain via `options-put-call-report setup-email`. If email fails, check logs for Resend stage diagnostics such as `stage=send` and HTTP status when available.
 
 ## Shared commands and locations
 
