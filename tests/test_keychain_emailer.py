@@ -151,6 +151,7 @@ def test_send_email_report_posts_html_to_resend(monkeypatch: pytest.MonkeyPatch,
     assert request.get_method() == "POST"
     assert request.headers["Authorization"] == "Bearer re_secret"
     assert request.headers["Content-type"] == "application/json"
+    assert request.headers["User-agent"] == "options-put-call-reporter/0.1.0"
     payload = json.loads(request.data.decode("utf-8"))
     assert payload == {
         "from": "reports@example.com",
