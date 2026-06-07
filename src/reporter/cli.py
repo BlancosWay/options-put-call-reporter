@@ -15,7 +15,7 @@ from reporter.config import ConfigError, load_config, load_symbol_file, symbols_
 from reporter.drift import build_drift
 from reporter.emailer import send_email_report
 from reporter.history import HistoryStore
-from reporter.keychain import KeychainError, get_password, set_password
+from reporter.keychain import KeychainError, get_password, get_system_keyring_password, set_password
 from reporter.models import EmailConfig, SymbolAnalysis, SymbolConfig, SymbolReport
 from reporter.reporting import render_reports
 
@@ -136,8 +136,18 @@ def _setup_email(args: argparse.Namespace) -> int:
     api_key = getpass.getpass("Resend API key: ").strip()
     if not from_email or not to_email:
         raise ValueError("Sender and recipient email addresses are required")
-    set_password(config.keychain_service, from_email, api_key)
-    print(f"Resend API key stored in the system keyring for {from_email}.")
+    try:
+        set_password(config.keychain_service, from_email, api_key)
+    except KeychainError as storage_error:
+        try:
+            existing_api_key = get_system_keyring_password(config.keychain_service, from_email)
+        except KeychainError:
+            raise storage_error from None
+        if existing_api_key != api_key:
+            raise storage_error from None
+        print(f"Existing matching Resend API key is already available in the system keyring for {from_email}.")
+    else:
+        print(f"Resend API key stored in the system keyring for {from_email}.")
     _write_email_config(args.email_config, EmailConfig(from_email=from_email, to_email=to_email))
     print(f"Email config written to {args.email_config}")
     return 0

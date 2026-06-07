@@ -42,6 +42,21 @@ def _safe_exception_detail(exc: Exception, secret: str) -> str:
     return exc.__class__.__name__
 
 
+def get_system_keyring_password(service: str, account: str) -> str:
+    keyring_failed = False
+    keyring_secret = None
+    try:
+        keyring_secret = keyring.get_password(service, account)
+    except Exception:
+        keyring_failed = True
+    if keyring_failed:
+        raise KeychainError(_keyring_read_error_message()) from None
+    secret = _trim_secret(keyring_secret)
+    if not secret:
+        raise KeychainError(_missing_secret_message(account))
+    return secret
+
+
 def get_password(service: str, account: str) -> str:
     env_secret = os.environ.get(RESEND_API_KEY_ENV)
     if env_secret is not None:
@@ -66,18 +81,7 @@ def get_password(service: str, account: str) -> str:
             raise KeychainError(f"{RESEND_API_KEY_FILE_ENV} points to an empty file")
         return secret
 
-    keyring_failed = False
-    keyring_secret = None
-    try:
-        keyring_secret = keyring.get_password(service, account)
-    except Exception:
-        keyring_failed = True
-    if keyring_failed:
-        raise KeychainError(_keyring_read_error_message()) from None
-    secret = _trim_secret(keyring_secret)
-    if not secret:
-        raise KeychainError(_missing_secret_message(account))
-    return secret
+    return get_system_keyring_password(service, account)
 
 
 def set_password(service: str, account: str, password: str) -> None:

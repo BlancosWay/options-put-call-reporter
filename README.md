@@ -162,7 +162,7 @@ options-put-call-report setup-email
 options-put-call-report run --send-email
 ```
 
-The setup command asks for the verified sender address, recipient email, and Resend API key. It writes only sender/recipient metadata to `config/email.local.json` and stores the API key in the system keyring: macOS Keychain, Windows Credential Manager, or Linux Secret Service/KWallet. If keyring storage fails, the setup error includes the underlying `keyring` exception type and message with the API key omitted.
+The setup command asks for the verified sender address, recipient email, and Resend API key. It writes only sender/recipient metadata to `config/email.local.json` and stores the API key in the system keyring: macOS Keychain, Windows Credential Manager, or Linux Secret Service/KWallet. If keyring storage fails but the same key is already readable from the system keyring, setup reuses that existing item and still writes `config/email.local.json`. Other keyring storage failures include the underlying `keyring` exception type and message with the API key omitted.
 
 For CI and secret-manager injection, expose the key as an environment variable without typing the secret into a shell command:
 
@@ -266,7 +266,7 @@ CI runs the test suite on Python 3.11 and 3.12 and builds the package.
 | Browser collection fails immediately | Playwright Chromium is missing | For pipx installs, run `python3 -m pipx run --spec playwright playwright install chromium`. In a checkout, run `python -m playwright install chromium`. |
 | Barchart collection fails for one symbol | Barchart page or network response failed | Inspect `archive/YYYY-MM-DD/{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`; if fallback succeeds, also inspect `{SYMBOL}-yfin-raw.json`. |
 | Report uses yfin.dev fallback | Barchart failed and fallback succeeded | Check the report data-source disclosure and `{SYMBOL}-yfin-raw.json`; Barchart-only IV Rank/Percentile metrics may be unavailable. |
-| `setup-email` cannot store the API key | System keyring is locked, unavailable, denied, or missing a backend | Read the `Keyring error:` detail printed by setup, unlock/configure the desktop keyring, or use `RESEND_API_KEY` / `RESEND_API_KEY_FILE` instead. |
+| `setup-email` cannot store the API key | System keyring is locked, unavailable, denied, missing a backend, or refusing to replace a different existing item | Read the `Keyring error:` detail printed by setup, unlock/configure the desktop keyring, delete/rotate the stale item if needed, or use `RESEND_API_KEY` / `RESEND_API_KEY_FILE` instead. |
 | Email send fails | Resend API key, verified sender, local recipient config, or Resend API request is invalid | Re-run `options-put-call-report setup-email`, confirm `config/email.local.json` exists locally, verify the sender in Resend, and inspect the Resend stage/status in the error. |
 | Fresh install has no `config/symbols.json` | GitHub install uses packaged defaults | Run without a config file to use packaged defaults, or pass symbols in the terminal or via `--symbols-file`. |
 

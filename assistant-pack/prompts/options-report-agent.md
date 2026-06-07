@@ -32,7 +32,7 @@ Safety:
 - Use the system keyring on desktop machines and environment variables or secret files for headless/CI runs.
 - Never ask users to paste Resend API keys into chat.
 - Never commit Resend API keys.
-- If `setup-email` cannot write to the system keyring, use the sanitized `Keyring error:` detail to diagnose the backend or switch to `RESEND_API_KEY` / `RESEND_API_KEY_FILE`.
+- If `setup-email` cannot write to the system keyring, it can reuse an already-readable matching key; otherwise use the sanitized `Keyring error:` detail to diagnose the backend or switch to `RESEND_API_KEY` / `RESEND_API_KEY_FILE`.
 - Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Do not expose secrets.
 - Do not commit local archives, SQLite data, or email config.
