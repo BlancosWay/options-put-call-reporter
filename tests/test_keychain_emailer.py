@@ -115,6 +115,31 @@ def test_set_password_raises_without_leaking_secret_in_exception_chain(monkeypat
     assert exc.value.__context__ is None
 
 
+def test_set_password_normalizes_framework_exception_without_leaking_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "email-api-key-secret"
+
+    def fake_add(service: str, account: str, password: str) -> int:
+        raise OSError(f"framework failed for {password}")
+
+    monkeypatch.setattr("reporter.keychain._add_generic_password", fake_add)
+    monkeypatch.setattr(
+        "reporter.keychain._update_generic_password",
+        lambda service, account, password: 0,
+    )
+
+    with pytest.raises(
+        KeychainError,
+        match="Unable to store email API key in Keychain for account 'user@example.com'",
+    ) as exc:
+        set_password("service", "user@example.com", secret)
+
+    assert secret not in str(exc.value)
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
 def test_set_password_failure_mentions_email_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("reporter.keychain._add_generic_password", lambda service, account, password: -50)
     monkeypatch.setattr("reporter.keychain._update_generic_password", lambda service, account, password: 0)

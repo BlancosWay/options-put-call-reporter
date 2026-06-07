@@ -137,9 +137,18 @@ def _update_generic_password(service: str, account: str, password: str) -> int:
 def set_password(service: str, account: str, password: str) -> None:
     if not password:
         raise KeychainError("Cannot store an empty email API key in Keychain")
-    status = _add_generic_password(service, account, password)
-    if status == ERR_SEC_DUPLICATE_ITEM:
-        status = _update_generic_password(service, account, password)
+    storage_failed = False
+    status = ERR_SEC_SUCCESS
+    try:
+        status = _add_generic_password(service, account, password)
+        if status == ERR_SEC_DUPLICATE_ITEM:
+            status = _update_generic_password(service, account, password)
+    except KeychainError:
+        raise
+    except Exception:
+        storage_failed = True
+    if storage_failed:
+        raise KeychainError(f"Unable to store email API key in Keychain for account '{account}'") from None
     if status != ERR_SEC_SUCCESS:
         raise KeychainError(
             f"Unable to store email API key in Keychain for account '{account}' (status={status})"
