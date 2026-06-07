@@ -234,6 +234,14 @@ def test_load_config_rejects_non_https_resend_api_url(tmp_path: Path) -> None:
         load_config(config_path)
 
 
+def test_load_config_rejects_resend_api_url_without_hostname(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(config_path, {"resend_api_url": "https:///emails"})
+
+    with pytest.raises(ConfigError, match="HTTPS URL"):
+        load_config(config_path)
+
+
 def test_load_config_rejects_boolean_float_threshold(tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     write_config_with_threshold(config_path, "strong_bullish_volume_max", True)
