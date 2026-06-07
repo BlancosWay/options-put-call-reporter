@@ -137,6 +137,7 @@ def _setup_email(args: argparse.Namespace) -> int:
     if not from_email or not to_email:
         raise ValueError("Sender and recipient email addresses are required")
     set_password(config.keychain_service, from_email, api_key)
+    print(f"Resend API key stored in macOS Keychain for {from_email}.")
     _write_email_config(args.email_config, EmailConfig(from_email=from_email, to_email=to_email))
     print(f"Email config written to {args.email_config}")
     return 0
