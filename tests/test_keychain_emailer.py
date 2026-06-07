@@ -202,6 +202,44 @@ def test_send_email_report_http_failure_includes_safe_resend_diagnostics(
     assert exc.value.__context__ is None
 
 
+def test_send_email_report_truncates_large_http_error_body_after_redaction(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    html_path = tmp_path / "report.html"
+    html_path.write_text("<h1>Report</h1>", encoding="utf-8")
+    api_key = "re_super_secret"
+    body = f'{{"message":"bad key {api_key} {"x" * 1500} tail-marker"}}'
+
+    def fake_urlopen(request, timeout):
+        raise HTTPError(
+            url=request.full_url,
+            code=403,
+            msg="forbidden",
+            hdrs={},
+            fp=io.BytesIO(body.encode("utf-8")),
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    with pytest.raises(EmailError) as exc:
+        send_email_report(
+            email_config=EmailConfig("reports@example.com", "recipient@example.com"),
+            resend_api_url="https://api.resend.com/emails",
+            api_key=api_key,
+            subject="Daily report",
+            html_path=html_path,
+        )
+
+    message = str(exc.value)
+    assert "<redacted>" in message
+    assert "<truncated>" in message
+    assert "tail-marker" not in message
+    assert api_key not in message
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
 def test_send_email_report_url_failure_does_not_leak_api_key(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -9,6 +9,7 @@ from reporter.models import EmailConfig
 
 
 DEFAULT_EMAIL_TIMEOUT_SECONDS = 30
+MAX_HTTP_ERROR_BODY_CHARS = 1000
 _EMAIL_TEXT = "Daily options put/call report is attached as HTML content."
 
 
@@ -31,7 +32,10 @@ def _safe_http_error_body(exc: HTTPError, api_key: str) -> str:
         body = exc.read().decode("utf-8", errors="replace")
     except Exception:
         return ""
-    return _redact(body, api_key)
+    body = _redact(body, api_key)
+    if len(body) > MAX_HTTP_ERROR_BODY_CHARS:
+        return f"{body[:MAX_HTTP_ERROR_BODY_CHARS]}...<truncated>"
+    return body
 
 
 def send_email_report(
