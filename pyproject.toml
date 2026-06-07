@@ -28,6 +28,7 @@ classifiers = [
   "Topic :: Utilities"
 ]
 dependencies = [
+  "keyring>=25,<26",
   "playwright>=1.46,<2"
 ]
 
