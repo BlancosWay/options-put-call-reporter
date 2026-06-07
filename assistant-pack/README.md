@@ -31,7 +31,7 @@ Paste `assistant-pack/prompts/options-report-agent.md` into assistants that do n
 
 ## Safety
 
-Treat generated reports as options-sentiment research, not financial advice. Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring. Use the system keyring on desktop machines and environment variables or secret files for headless servers, containers, and CI. Never paste secrets into chat; never commit keys. If `setup-email` cannot write to the keyring, use the sanitized `Keyring error:` detail to diagnose the backend or switch to env/file secrets. If email fails, check logs for Resend stage diagnostics such as `stage=send` and HTTP status when available.
+Treat generated reports as options-sentiment research, not financial advice. Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring. Use the system keyring on desktop machines and environment variables or secret files for headless servers, containers, and CI. Never paste secrets into chat; never commit keys. If `setup-email` cannot write to the keyring, it can reuse an already-readable matching key; otherwise use the sanitized `Keyring error:` detail to diagnose the backend or switch to env/file secrets. If email fails, check logs for Resend stage diagnostics such as `stage=send` and HTTP status when available.
 
 ## Shared commands and locations
 
