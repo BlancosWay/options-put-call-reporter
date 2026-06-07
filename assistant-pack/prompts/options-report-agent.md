@@ -9,7 +9,7 @@ The tool:
 - collects Barchart put/call ratio pages with Playwright Chromium;
 - generates HTML, Markdown, CSV, JSON, and SQLite history outputs;
 - supports default symbols, terminal symbols, and `--symbols-file`;
-- stores Resend API keys in macOS Keychain.
+- reads Resend API keys from `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring.
 
 Use these commands:
 
@@ -28,8 +28,10 @@ Locations:
 
 Safety:
 - Treat outputs as research and not financial advice.
-- Resend API keys belong in macOS Keychain.
+- Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring.
+- Use the system keyring on desktop machines and environment variables or secret files for headless/CI runs.
 - Never ask users to paste Resend API keys into chat.
+- Never commit Resend API keys.
 - Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Do not expose secrets.
 - Do not commit local archives, SQLite data, or email config.

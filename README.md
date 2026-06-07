@@ -170,20 +170,23 @@ For Linux servers, containers, and CI, prefer environment variables or a mounted
 export RESEND_API_KEY="re_..."
 options-put-call-report run --send-email
 
+mkdir -p ~/.config/options-put-call-report
 printf '%s\n' "$RESEND_API_KEY" > ~/.config/options-put-call-report/resend-api-key
 chmod 600 ~/.config/options-put-call-report/resend-api-key
 export RESEND_API_KEY_FILE=~/.config/options-put-call-report/resend-api-key
 options-put-call-report run --send-email
 ```
 
+The key source only provides the Resend secret. Every `run --send-email` invocation also needs sender/recipient metadata in `config/email.local.json` or a JSON file passed with `--email-config`; that file must contain `from_email` and `to_email`.
+
 | Environment | Install | Setup | Maintenance |
 | --- | --- | --- | --- |
 | macOS desktop | `python3.11 -m venv .venv && ./.venv/bin/python -m pip install -e ".[dev]"` | Run `options-put-call-report setup-email`; keyring stores in macOS Keychain. | Re-run setup when rotating Resend keys; use Keychain Access to delete stale entries. |
 | Windows desktop | Create a Python 3.11+ venv, then `python -m pip install -e ".[dev]"`. | Run `options-put-call-report setup-email`; keyring stores in Windows Credential Manager. | Re-run setup when rotating keys; remove stale credentials from Credential Manager. |
 | Linux desktop | Install Python 3.11+, package deps, and a Secret Service/KWallet backend such as GNOME Keyring or KWallet; then install the package. | Run `options-put-call-report setup-email` in an unlocked desktop session. | If keyring is locked/unavailable, unlock the desktop keyring or use env/file fallback. |
-| Linux headless/server | Install Python 3.11+ and the package. | Set `RESEND_API_KEY` or `RESEND_API_KEY_FILE`; do not require a desktop keyring. | Rotate the host secret and restart the scheduler/process. |
-| Docker/Kubernetes | Install package in the image. | Mount the Resend key as a secret file and set `RESEND_API_KEY_FILE`. | Rotate the orchestrator secret and restart workloads. |
-| GitHub Actions | Install with `python -m pip install -e ".[dev]"`. | Store the key in repository/environment secrets and expose it as `RESEND_API_KEY`. | Rotate GitHub secret; never print it in logs. |
+| Linux headless/server | Install Python 3.11+ and the package. | Set `RESEND_API_KEY` or `RESEND_API_KEY_FILE`; also provide `config/email.local.json` or `--email-config` with `from_email` and `to_email`. | Rotate the host secret and restart the scheduler/process. |
+| Docker/Kubernetes | Install package in the image. | Mount the Resend key as a secret file and set `RESEND_API_KEY_FILE`; also mount an email metadata JSON and pass `--email-config` if it is not at `config/email.local.json`. | Rotate the orchestrator secret and restart workloads. |
+| GitHub Actions | Install with `python -m pip install -e ".[dev]"`. | Store the key in repository/environment secrets and expose it as `RESEND_API_KEY`; create `config/email.local.json` or pass `--email-config` with `from_email` and `to_email`. | Rotate GitHub secret; never print it in logs. |
 
 Older custom email configs created before Resend support need these email fields in `config/symbols.json` before running setup:
 
