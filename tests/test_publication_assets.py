@@ -119,6 +119,10 @@ def test_maintenance_doc_covers_ci_dependabot_and_release_workflow() -> None:
         "Dependabot auto-merge",
         "semver patch and minor",
         "major updates remain manual",
+        "Owner auto-merge",
+        "github.event.pull_request.user.login == 'BlancosWay'",
+        "BlancosWay PRs",
+        "required checks still gate the final merge",
         "github.event.pull_request.user.login",
         "gh pr checks",
         "gh run list",
@@ -292,3 +296,17 @@ def test_dependabot_auto_merge_only_allows_patch_and_minor_updates() -> None:
 
     assert "github.actor == 'dependabot[bot]'" not in workflow
     assert "version-update:semver-major" not in workflow
+
+
+def test_owner_auto_merge_enables_auto_merge_for_blancosway_prs() -> None:
+    workflow = _read(".github/workflows/dependabot-auto-merge.yml")
+
+    for text in [
+        "owner-auto-merge:",
+        "github.event.pull_request.user.login == 'BlancosWay'",
+        "!github.event.pull_request.draft",
+        "Enable auto-merge for BlancosWay PRs",
+        "gh pr merge --auto --squash \"$PR_URL\"",
+        "PR_URL: \"${{ github.event.pull_request.html_url }}\"",
+    ]:
+        assert text in workflow

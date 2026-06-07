@@ -28,3 +28,14 @@ jobs:
         env:
           GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           PR_URL: "${{ github.event.pull_request.html_url }}"
+
+  owner-auto-merge:
+    if: github.event.pull_request.user.login == 'BlancosWay' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enable auto-merge for BlancosWay PRs
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          PR_URL: "${{ github.event.pull_request.html_url }}"

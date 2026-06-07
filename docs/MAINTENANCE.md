@@ -49,7 +49,7 @@ GitHub Actions runs the package on:
 
 The CI workflow installs the package with development dependencies, installs Playwright Chromium, runs `pytest -q`, and runs `python -m build`.
 
-## Dependabot auto-merge
+## Auto-merge policy
 
 Dependabot opens weekly PRs for:
 
@@ -65,6 +65,16 @@ The repository allows GitHub native auto-merge and delete-branch-on-merge. `.git
 
 By policy, major updates remain manual. If a Dependabot auto-merge job is skipped, inspect the run and metadata:
 
+### Owner auto-merge
+
+BlancosWay PRs are eligible for auto-merge when:
+
+- The event is `pull_request_target`.
+- `github.event.pull_request.user.login == 'BlancosWay'`.
+- The PR is not a draft.
+
+The workflow runs `gh pr merge --auto --squash`, which enables native GitHub auto-merge. Protected branch required checks still gate the final merge; GitHub waits for Python 3.11 and Python 3.12 checks to pass before merging.
+
 ```bash
 gh run list --workflow "Dependabot auto-merge" --limit 10
 gh run view <run-id> --log
@@ -75,7 +85,8 @@ Common skip causes:
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Job skipped on a non-Dependabot PR | PR author is not `dependabot[bot]` | Expected; only Dependabot PRs are eligible. |
+| Dependabot job skipped on a non-Dependabot PR | PR author is not `dependabot[bot]` | Expected; only Dependabot PRs are eligible for that job. |
+| Owner job skipped on a non-BlancosWay PR | PR author is not `BlancosWay` | Expected; only BlancosWay PRs are eligible for owner auto-merge. |
 | Auto-merge step skipped but job succeeds | Update is semver-major | Review and merge manually if acceptable. |
 | Required checks block auto-merge | Python 3.11 or Python 3.12 failed or is pending | Fix the failing check or wait for completion. |
 
