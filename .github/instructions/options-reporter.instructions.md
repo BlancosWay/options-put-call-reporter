@@ -19,7 +19,7 @@ applyTo: "**/*"
 - Tests live in `tests/` and should use deterministic fixtures.
 - Do not commit `archive/`, `data/`, or `config/email.local.json`.
 - Treat report output as research and not financial advice.
-- Resend API keys belong in macOS Keychain.
+- Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring; never commit them or ask users to paste them into chat.
 - Never ask users to paste Resend API keys into chat.
 - Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Supported agents/platforms: Claude Code, GitHub Copilot, Codex, and Gemini.

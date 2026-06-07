@@ -31,8 +31,9 @@ options-put-call-report setup-email
 
 - Treat output as options-sentiment research, not financial advice.
 - Never ask users to paste Resend API keys into chat.
-- Resend API keys belong in macOS Keychain.
-- Use macOS Keychain via `setup-email`.
+- Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring.
+- Use the system keyring on desktop machines and environment variables or secret files for headless servers, containers, and CI.
+- Never commit Resend API keys.
 - Re-run `options-put-call-report setup-email` if Resend email fails after an older setup; email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Keep `archive/`, `data/`, and `config/email.local.json` out of git.
 - When changing code, write tests first and run `pytest -q`.

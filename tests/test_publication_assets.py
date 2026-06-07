@@ -86,12 +86,16 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "`{SYMBOL}-failure.png`",
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
+        "mkdir -p ~/.config/options-put-call-report",
+        "Every `run --send-email` invocation also needs sender/recipient metadata",
+        "`--email-config`",
+        "`from_email` and `to_email`",
     ]:
         assert text in readme
 
     security = _read("SECURITY.md")
     assert "data/history.sqlite3" not in security
-    assert "data/" in security
+    assert "`data`" in security
 
 
 def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
@@ -111,7 +115,7 @@ def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
         "src/reporter/reporting.py",
         "archive/YYYY-MM-DD/",
         "data/history.sqlite3",
-        "macOS Keychain",
+        "system keyring",
         "launchd",
         "Safe change points",
     ]:
@@ -259,7 +263,7 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "archive/YYYY-MM-DD",
         "data/history.sqlite3",
         "Barchart",
-        "macOS Keychain",
+        "system keyring",
         "not financial advice",
         "Claude Code",
         "GitHub Copilot",
@@ -268,34 +272,52 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
         "Re-run `options-put-call-report setup-email`",
-        "Resend API keys belong in macOS Keychain",
-        "Resend API keys should stay in macOS Keychain",
+        "RESEND_API_KEY",
+        "RESEND_API_KEY_FILE",
+        "Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring",
+        "Use the system keyring on desktop machines and environment variables or secret files for headless servers, containers, and CI",
         "stage=send",
     ]:
         assert text in combined
 
-    assert "Resend API keys belong in macOS Keychain" in _read("AGENTS.md")
-    assert "Resend API keys should stay in macOS Keychain" in _read("assistant-pack/README.md")
+    assert "Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring" in _read("AGENTS.md")
+    assert "RESEND_API_KEY" in _read("assistant-pack/README.md")
+    assert "RESEND_API_KEY_FILE" in _read("assistant-pack/README.md")
 
     assistant_pack_expectations = {
         "assistant-pack/README.md": [
             "Resend API keys",
-            "macOS Keychain",
+            "RESEND_API_KEY",
+            "RESEND_API_KEY_FILE",
+            "system keyring",
+            "desktop",
+            "headless servers, containers, and CI",
             "Never paste secrets into chat",
+            "never commit keys",
             "stage=send",
             "HTTP status",
         ],
         "assistant-pack/prompts/options-report-agent.md": [
             "Resend API keys",
-            "macOS Keychain",
+            "RESEND_API_KEY",
+            "RESEND_API_KEY_FILE",
+            "system keyring",
+            "desktop",
+            "headless/CI",
             "Never ask users to paste Resend API keys into chat",
+            "Never commit Resend API keys",
             "stage=send",
             "HTTP status",
         ],
         "assistant-pack/claude/options-put-call-reporter/SKILL.md": [
             "Resend API keys",
-            "macOS Keychain",
+            "RESEND_API_KEY",
+            "RESEND_API_KEY_FILE",
+            "system keyring",
+            "desktop machines",
+            "headless servers, containers, and CI",
             "Never ask users to paste Resend API keys into chat",
+            "Never commit Resend API keys",
             "stage=send",
             "HTTP status",
         ],
@@ -317,7 +339,9 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
             assert text in content, f"{native_file} missing {text}"
         for text in [
             "Resend API keys",
-            "macOS Keychain",
+            "RESEND_API_KEY",
+            "RESEND_API_KEY_FILE",
+            "system keyring",
             "Never ask users to paste Resend API keys into chat",
             "stage=send",
             "HTTP status",

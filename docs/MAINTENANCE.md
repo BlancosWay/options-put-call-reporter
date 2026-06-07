@@ -18,6 +18,15 @@ python -m build
 
 Run `pytest -q` and `python -m build` before publishing or claiming a change is complete.
 
+## Secret storage maintenance
+
+- macOS: `setup-email` stores the Resend API key in macOS Keychain. Rotate by rerunning setup, or delete stale entries with Keychain Access.
+- Windows: `setup-email` stores the key in Windows Credential Manager. Rotate by rerunning setup, or delete stale entries with Credential Manager.
+- Linux desktop: `setup-email` requires an available Secret Service/KWallet backend. If the keyring is locked or unavailable, unlock it or use `RESEND_API_KEY` / `RESEND_API_KEY_FILE`.
+- Linux headless/server: prefer `RESEND_API_KEY` or `RESEND_API_KEY_FILE`; restart scheduled jobs after rotating the secret.
+- Containers/Kubernetes: mount the key as a secret file and set `RESEND_API_KEY_FILE`.
+- GitHub Actions: store the key in repository or environment secrets and expose it as `RESEND_API_KEY`.
+
 ## Branch and PR workflow
 
 `main` is protected. Use a feature branch and pull request for changes:

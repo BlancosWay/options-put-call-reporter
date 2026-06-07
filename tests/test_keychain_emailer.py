@@ -1,7 +1,6 @@
 import io
 import json
 from pathlib import Path
-import subprocess
 import traceback
 from urllib.error import HTTPError, URLError
 
@@ -12,144 +11,192 @@ from reporter.keychain import KeychainError, get_password, set_password
 from reporter.models import EmailConfig
 
 
-class Completed:
-    def __init__(self, stdout: str = "") -> None:
-        self.stdout = stdout
+def test_get_password_prefers_resend_api_key_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    secret_file = tmp_path / "resend-key"
+    secret_file.write_text("re_from_file\n", encoding="utf-8")
+    monkeypatch.setenv("RESEND_API_KEY", "re_from_env")
+    monkeypatch.setenv("RESEND_API_KEY_FILE", str(secret_file))
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: "re_from_keyring")
+
+    assert get_password("service", "user@example.com") == "re_from_env"
 
 
-def test_get_password_calls_security_find(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[list[str]] = []
+def test_get_password_reads_resend_api_key_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    secret_file = tmp_path / "resend-key"
+    secret_file.write_text("re_from_file\n", encoding="utf-8")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY_FILE", str(secret_file))
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: "re_from_keyring")
 
-    def fake_run(args, check, capture_output, text):
-        calls.append(args)
-        return Completed(stdout="api-key\n")
-
-    monkeypatch.setattr("subprocess.run", fake_run)
-
-    assert get_password("service", "user@example.com") == "api-key"
-    assert calls[0][:3] == ["security", "find-generic-password", "-a"]
+    assert get_password("service", "user@example.com") == "re_from_file"
 
 
-def test_set_password_adds_secret_through_security_framework(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_password_uses_system_keyring_after_env_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_get_password(service: str, account: str) -> str:
+        calls.append((service, account))
+        return "re_from_keyring"
+
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", fake_get_password)
+
+    assert get_password("service", "user@example.com") == "re_from_keyring"
+    assert calls == [("service", "user@example.com")]
+
+
+def test_get_password_raises_actionable_error_when_no_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: None)
+
+    with pytest.raises(
+        KeychainError,
+        match="Set RESEND_API_KEY, set RESEND_API_KEY_FILE, or run setup-email",
+    ):
+        get_password("service", "user@example.com")
+
+
+def test_get_password_rejects_empty_env_without_falling_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RESEND_API_KEY", "   ")
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr(
+        "reporter.keychain.keyring.get_password",
+        lambda service, account: (_ for _ in ()).throw(AssertionError("keyring should not be used")),
+    )
+
+    with pytest.raises(KeychainError, match="RESEND_API_KEY is set but empty"):
+        get_password("service", "user@example.com")
+
+
+def test_get_password_rejects_empty_key_file_without_leaking_secret_path_contents(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    secret_file = tmp_path / "resend-key"
+    secret_file.write_text("\n", encoding="utf-8")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY_FILE", str(secret_file))
+
+    with pytest.raises(KeychainError, match="RESEND_API_KEY_FILE points to an empty file") as exc:
+        get_password("service", "user@example.com")
+
+    assert str(secret_file) not in str(exc.value)
+    assert "resend-key" not in str(exc.value)
+
+
+def test_get_password_rejects_unreadable_key_file_without_leaking_env_value(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    secret_path = str(tmp_path / "secret-re_path-value")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY_FILE", secret_path)
+
+    with pytest.raises(KeychainError, match="RESEND_API_KEY_FILE is set but could not be read") as exc:
+        get_password("service", "user@example.com")
+
+    assert secret_path not in str(exc.value)
+    assert "secret-re_path-value" not in str(exc.value)
+
+
+def test_get_password_rejects_invalid_utf8_key_file_without_leaking_env_value(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    secret_file = tmp_path / "secret-re_invalid_utf8"
+    secret_file.write_bytes(b"re_valid_prefix_\xff\xfe\n")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY_FILE", str(secret_file))
+
+    with pytest.raises(KeychainError, match="RESEND_API_KEY_FILE is set but could not be read") as exc:
+        get_password("service", "user@example.com")
+
+    assert str(secret_file) not in str(exc.value)
+    assert "secret-re_invalid_utf8" not in str(exc.value)
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
+def test_get_password_treats_empty_keyring_secret_as_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: "")
+
+    with pytest.raises(
+        KeychainError,
+        match="Set RESEND_API_KEY, set RESEND_API_KEY_FILE, or run setup-email",
+    ) as exc:
+        get_password("service", "user@example.com")
+
+    assert "user@example.com" in str(exc.value)
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
+def test_get_password_keyring_read_failure_is_sanitized(monkeypatch: pytest.MonkeyPatch) -> None:
+    secret = "re_secret_from_backend_error"
+
+    def fake_get_password(service: str, account: str) -> str:
+        raise RuntimeError(f"backend leaked {secret}")
+
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", fake_get_password)
+
+    with pytest.raises(
+        KeychainError,
+        match=(
+            "Unable to read the system keyring. Set RESEND_API_KEY, "
+            "set RESEND_API_KEY_FILE, or configure a working keyring backend."
+        ),
+    ) as exc:
+        get_password("service", "user@example.com")
+
+    assert secret not in str(exc.value)
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
+def test_set_password_stores_secret_in_system_keyring(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, str, str]] = []
 
-    def fake_add(service: str, account: str, password: str) -> int:
+    def fake_set_password(service: str, account: str, password: str) -> None:
         calls.append((service, account, password))
-        return 0
 
-    def fake_update(service: str, account: str, password: str) -> int:
-        raise AssertionError("update should not run for a new Keychain item")
+    monkeypatch.setattr("reporter.keychain.keyring.set_password", fake_set_password)
 
-    monkeypatch.setattr("reporter.keychain._add_generic_password", fake_add)
-    monkeypatch.setattr("reporter.keychain._update_generic_password", fake_update)
+    set_password("service", "reports@example.com", "  re_secret  ")
 
-    set_password("service", "user@example.com", "re_secret")
-
-    assert calls == [("service", "user@example.com", "re_secret")]
-
-
-def test_set_password_updates_existing_keychain_item(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[str, str, str, str]] = []
-
-    def fake_add(service: str, account: str, password: str) -> int:
-        calls.append(("add", service, account, password))
-        return -25299
-
-    def fake_update(service: str, account: str, password: str) -> int:
-        calls.append(("update", service, account, password))
-        return 0
-
-    monkeypatch.setattr("reporter.keychain._add_generic_password", fake_add)
-    monkeypatch.setattr("reporter.keychain._update_generic_password", fake_update)
-
-    set_password("service", "user@example.com", "re_secret")
-
-    assert calls == [
-        ("add", "service", "user@example.com", "re_secret"),
-        ("update", "service", "user@example.com", "re_secret"),
-    ]
+    assert calls == [("service", "reports@example.com", "re_secret")]
 
 
 def test_set_password_rejects_empty_email_api_key() -> None:
-    with pytest.raises(KeychainError, match="Cannot store an empty email API key in Keychain"):
+    with pytest.raises(KeychainError, match="Cannot store an empty email API key in the system keyring"):
         set_password("service", "reports@example.com", "")
 
 
-def test_get_password_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_run(args, check, capture_output, text):
-        raise OSError("security missing")
-
-    monkeypatch.setattr("subprocess.run", fake_run)
-
-    with pytest.raises(
-        KeychainError,
-        match="Email API key not found in Keychain for account 'user@example.com'",
-    ):
-        get_password("service", "user@example.com")
+def test_set_password_rejects_whitespace_only_email_api_key() -> None:
+    with pytest.raises(KeychainError, match="Cannot store an empty email API key in the system keyring"):
+        set_password("service", "reports@example.com", "   ")
 
 
-def test_get_password_raises_email_api_key_error_for_empty_secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_run(args, check, capture_output, text):
-        return Completed(stdout="\n")
+def test_set_password_normalizes_keyring_failure_without_leaking_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    secret = "re_secret_value"
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    def fake_set_password(service: str, account: str, password: str) -> None:
+        raise RuntimeError(f"backend failed for {password}")
+
+    monkeypatch.setattr("reporter.keychain.keyring.set_password", fake_set_password)
 
     with pytest.raises(
         KeychainError,
-        match="Keychain returned an empty email API key for account 'user@example.com'",
-    ):
-        get_password("service", "user@example.com")
-
-
-def test_set_password_raises_without_leaking_secret_in_exception_chain(monkeypatch: pytest.MonkeyPatch) -> None:
-    secret = "email-api-key-secret"
-
-    monkeypatch.setattr("reporter.keychain._add_generic_password", lambda service, account, password: -50)
-    monkeypatch.setattr("reporter.keychain._update_generic_password", lambda service, account, password: 0)
-
-    with pytest.raises(KeychainError) as exc:
-        set_password("service", "user@example.com", secret)
+        match="Unable to store email API key in the system keyring for account 'reports@example.com'",
+    ) as exc:
+        set_password("service", "reports@example.com", secret)
 
     assert secret not in str(exc.value)
-    assert exc.value.__cause__ is None
-    assert exc.value.__context__ is None
-
-
-def test_set_password_normalizes_framework_exception_without_leaking_secret(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    secret = "email-api-key-secret"
-
-    def fake_add(service: str, account: str, password: str) -> int:
-        raise OSError(f"framework failed for {password}")
-
-    monkeypatch.setattr("reporter.keychain._add_generic_password", fake_add)
-    monkeypatch.setattr(
-        "reporter.keychain._update_generic_password",
-        lambda service, account, password: 0,
-    )
-
-    with pytest.raises(
-        KeychainError,
-        match="Unable to store email API key in Keychain for account 'user@example.com'",
-    ) as exc:
-        set_password("service", "user@example.com", secret)
-
-    assert secret not in str(exc.value)
-    assert exc.value.__cause__ is None
-    assert exc.value.__context__ is None
-
-
-def test_set_password_failure_mentions_email_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("reporter.keychain._add_generic_password", lambda service, account, password: -50)
-    monkeypatch.setattr("reporter.keychain._update_generic_password", lambda service, account, password: 0)
-
-    with pytest.raises(
-        KeychainError,
-        match=r"Unable to store email API key in Keychain for account 'reports@example.com' \(status=-50\)",
-    ) as exc:
-        set_password("service", "reports@example.com", "re_secret")
-
     assert exc.value.__cause__ is None
     assert exc.value.__context__ is None
 

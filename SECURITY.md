@@ -6,7 +6,7 @@ Open a private security advisory on GitHub if available, or contact the reposito
 
 ## Sensitive data
 
-Never commit Resend API keys, `config/email.local.json`, generated `archive/` files, or `data/`. The tool stores Resend API keys in macOS Keychain through the `setup-email` command.
+Never commit Resend API keys, `config/email.local.json`, generated `archive/` files, or `data`. The tool reads Resend API keys from `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring through Python `keyring`.
 
 See `docs/MAINTENANCE.md` for the generated-file checklist used before publishing changes.
 

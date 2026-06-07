@@ -49,7 +49,7 @@ Reports include data-source disclosure for every successful symbol.
 
 ## Email and scheduler boundaries
 
-Email configuration lives in `config/email.local.json`, and Resend API keys are stored in macOS Keychain. Email sending is isolated in `src/reporter/emailer.py` and `src/reporter/keychain.py`. Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
+Email configuration lives in `config/email.local.json`, while Resend API keys are resolved by `src/reporter/keychain.py` from `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring. Email sending is isolated in `src/reporter/emailer.py`; email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 
 The macOS launchd scheduler scripts live under `scripts/`. Scheduled runs write logs to `archive/runner.log`, `archive/launchd.out.log`, and `archive/launchd.err.log`.
 
