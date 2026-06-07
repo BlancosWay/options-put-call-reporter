@@ -4,6 +4,7 @@ from pathlib import Path
 
 from reporter.cli import main
 from reporter.history import HistoryStore
+from reporter.keychain import KeychainError
 from reporter.models import EmailConfig, ExpirationRow, Snapshot, SymbolConfig, TopMetrics
 
 
@@ -15,9 +16,8 @@ def _config(path: Path, symbols: list[str] | None = None) -> None:
                 "archive_dir": str(path.parent / "archive"),
                 "database_path": str(path.parent / "history.sqlite3"),
                 "report_time_local": "14:30",
-                "keychain_service": "options-put-call-reporter:gmail-app-password",
-                "gmail_smtp_host": "smtp.gmail.com",
-                "gmail_smtp_port": 587,
+                "keychain_service": "options-put-call-reporter:resend-api-key",
+                "resend_api_url": "https://api.resend.com/emails",
                 "thresholds": {
                     "strong_bullish_volume_max": 0.35,
                     "strong_bullish_oi_max": 0.7,
@@ -325,16 +325,21 @@ def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: P
     email_config_path = tmp_path / "email.local.json"
     _config(config_path)
     email_config_path.write_text(
-        json.dumps({"from_email": "sender@gmail.com", "to_email": "recipient@gmail.com"}),
+        json.dumps({"from_email": "reports@example.com", "to_email": "recipient@example.com"}),
         encoding="utf-8",
     )
     sent: dict[str, object] = {}
+    keychain_lookups: list[tuple[str, str]] = []
 
     async def fake_collect(symbol_config, captured_at, archive_dir):
         return _sample_snapshot(symbol_config, captured_at, archive_dir)
 
+    def fake_get_password(service, account):
+        keychain_lookups.append((service, account))
+        return "re_secret"
+
     monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
-    monkeypatch.setattr("reporter.cli.get_password", lambda service, account: "app-password")
+    monkeypatch.setattr("reporter.cli.get_password", fake_get_password)
     monkeypatch.setattr(
         "reporter.cli.send_email_report",
         lambda **kwargs: sent.update(kwargs),
@@ -352,17 +357,17 @@ def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: P
     ])
 
     assert exit_code == 0
-    assert sent["email_config"] == EmailConfig("sender@gmail.com", "recipient@gmail.com")
-    assert sent["app_password"] == "app-password"
-    assert sent["smtp_host"] == "smtp.gmail.com"
-    assert sent["smtp_port"] == 587
+    assert keychain_lookups == [("options-put-call-reporter:resend-api-key", "reports@example.com")]
+    assert sent["email_config"] == EmailConfig("reports@example.com", "recipient@example.com")
+    assert sent["resend_api_url"] == "https://api.resend.com/emails"
+    assert sent["api_key"] == "re_secret"
     assert sent["subject"] == "Complete Options Put/Call Report - 2026-06-02"
     assert Path(sent["html_path"]).name == "report.html"
     captured = capsys.readouterr()
     assert "Sending email..." in captured.out
     assert "Email sent." in captured.out
-    assert "app-password" not in captured.out
-    assert "app-password" not in captured.err
+    assert "re_secret" not in captured.out
+    assert "re_secret" not in captured.err
 
 
 def test_run_send_email_failure_prints_clear_error_and_keeps_report(
@@ -374,7 +379,7 @@ def test_run_send_email_failure_prints_clear_error_and_keeps_report(
     email_config_path = tmp_path / "email.local.json"
     _config(config_path)
     email_config_path.write_text(
-        json.dumps({"from_email": "sender@gmail.com", "to_email": "recipient@gmail.com"}),
+        json.dumps({"from_email": "reports@example.com", "to_email": "recipient@example.com"}),
         encoding="utf-8",
     )
 
@@ -382,10 +387,10 @@ def test_run_send_email_failure_prints_clear_error_and_keeps_report(
         return _sample_snapshot(symbol_config, captured_at, archive_dir)
 
     monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
-    monkeypatch.setattr("reporter.cli.get_password", lambda service, account: "app-password")
+    monkeypatch.setattr("reporter.cli.get_password", lambda service, account: "re_secret")
     monkeypatch.setattr(
         "reporter.cli.send_email_report",
-        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("SMTP unavailable")),
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("Resend unavailable")),
     )
 
     exit_code = main([
@@ -403,9 +408,11 @@ def test_run_send_email_failure_prints_clear_error_and_keeps_report(
     report_path = tmp_path / "archive" / "2026-06-02" / "report.html"
     assert report_path.exists()
     captured = capsys.readouterr()
-    assert "Email was not sent: SMTP unavailable" in captured.err
+    assert "Email was not sent: Resend unavailable" in captured.err
     assert str(report_path) in captured.err
     assert "Report written to" in captured.out
+    assert "re_secret" not in captured.out
+    assert "re_secret" not in captured.err
 
 
 def test_run_send_email_missing_keychain_prints_clear_error_and_keeps_report(
@@ -417,7 +424,7 @@ def test_run_send_email_missing_keychain_prints_clear_error_and_keeps_report(
     email_config_path = tmp_path / "email.local.json"
     _config(config_path)
     email_config_path.write_text(
-        json.dumps({"from_email": "sender@gmail.com", "to_email": "recipient@gmail.com"}),
+        json.dumps({"from_email": "reports@example.com", "to_email": "recipient@example.com"}),
         encoding="utf-8",
     )
 
@@ -450,10 +457,20 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
     config_path = tmp_path / "symbols.json"
     _config(config_path)
     stored: dict[str, str] = {}
-    answers = iter(["sender@gmail.com", "recipient@gmail.com", "app-password"])
+    answers = iter(["reports@example.com", "recipient@example.com", "re_secret"])
+    input_prompts: list[str] = []
+    getpass_prompts: list[str] = []
 
-    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
-    monkeypatch.setattr("getpass.getpass", lambda prompt: next(answers))
+    def fake_input(prompt):
+        input_prompts.append(prompt)
+        return next(answers)
+
+    def fake_getpass(prompt):
+        getpass_prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("getpass.getpass", fake_getpass)
     monkeypatch.setattr(
         "reporter.cli.set_password",
         lambda service, account, password: stored.update({"service": service, "account": account, "password": password}),
@@ -462,10 +479,96 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
     exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
 
     assert exit_code == 0
+    assert input_prompts == ["Resend sender address: ", "Report recipient address: "]
+    assert getpass_prompts == ["Resend API key: "]
     assert stored == {
-        "service": "options-put-call-reporter:gmail-app-password",
-        "account": "sender@gmail.com",
-        "password": "app-password",
+        "service": "options-put-call-reporter:resend-api-key",
+        "account": "reports@example.com",
+        "password": "re_secret",
     }
     email_config = json.loads((tmp_path / "email.local.json").read_text(encoding="utf-8"))
-    assert email_config == {"from_email": "sender@gmail.com", "to_email": "recipient@gmail.com"}
+    assert email_config == {"from_email": "reports@example.com", "to_email": "recipient@example.com"}
+
+
+def test_setup_email_prints_clear_config_error_without_traceback(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    del config_data["resend_api_url"]
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "resend_api_url" in captured.err
+    assert "Traceback" not in captured.err
+    assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_prints_clear_validation_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    answers = iter(["", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Sender and recipient email addresses are required" in captured.err
+    assert "Traceback" not in captured.err
+    assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_prints_clear_keychain_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+    monkeypatch.setattr(
+        "reporter.cli.set_password",
+        lambda service, account, password: (_ for _ in ()).throw(KeychainError("Unable to store email API key")),
+    )
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Unable to store email API key" in captured.err
+    assert "Traceback" not in captured.err
+    assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_prints_clear_config_write_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    stored: dict[str, str] = {}
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+    monkeypatch.setattr(
+        "reporter.cli.set_password",
+        lambda service, account, password: stored.update({"service": service, "account": account, "password": password}),
+    )
+    monkeypatch.setattr(
+        "reporter.cli._write_email_config",
+        lambda path, email_config: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "disk full" in captured.err
+    assert "Traceback" not in captured.err
+    assert stored == {
+        "service": "options-put-call-reporter:resend-api-key",
+        "account": "reports@example.com",
+        "password": "re_secret",
+    }

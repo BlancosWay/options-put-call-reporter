@@ -25,10 +25,11 @@ def _require_string(data: dict[str, Any], key: str) -> str:
     return value
 
 
-def _require_int(data: dict[str, Any], key: str) -> int:
-    value = data.get(key)
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise ConfigError(f"Config value '{key}' must be an integer")
+def _require_https_url(data: dict[str, Any], key: str) -> str:
+    value = _require_string(data, key)
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or parsed.hostname is None:
+        raise ConfigError(f"Config value '{key}' must be an HTTPS URL")
     return value
 
 
@@ -135,8 +136,7 @@ def _config_from_data(data: Any) -> AppConfig:
         database_path=Path(_require_string(data, "database_path")),
         report_time_local=_require_string(data, "report_time_local"),
         keychain_service=_require_string(data, "keychain_service"),
-        gmail_smtp_host=_require_string(data, "gmail_smtp_host"),
-        gmail_smtp_port=_require_int(data, "gmail_smtp_port"),
+        resend_api_url=_require_https_url(data, "resend_api_url"),
         thresholds=_thresholds(data),
         symbols=_symbols(data),
     )

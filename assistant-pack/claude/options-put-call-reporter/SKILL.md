@@ -5,7 +5,7 @@ description: Use when users want to install, run, schedule, troubleshoot, or mai
 
 # Options Put/Call Reporter Skill
 
-Help users work with `options-put-call-report`, a Python CLI that collects Barchart put/call ratio data, generates sentiment reports, stores local history, and optionally sends Gmail reports.
+Help users work with `options-put-call-report`, a Python CLI that collects Barchart put/call ratio data, generates sentiment reports, stores local history, and optionally sends Resend reports.
 
 Supported platforms for this instruction pack are Claude Code, GitHub Copilot, Codex, and Gemini.
 
@@ -30,8 +30,9 @@ options-put-call-report setup-email
 ## Rules
 
 - Treat output as options-sentiment research, not financial advice.
-- Never ask users to paste Gmail App Passwords into chat.
+- Never ask users to paste Resend API keys into chat.
+- Resend API keys belong in macOS Keychain.
 - Use macOS Keychain via `setup-email`.
-- Re-run `options-put-call-report setup-email` if Gmail authentication fails after an older setup; email failure logs include SMTP stage diagnostics such as `stage=login`.
+- Re-run `options-put-call-report setup-email` if Resend email fails after an older setup; email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Keep `archive/`, `data/`, and `config/email.local.json` out of git.
 - When changing code, write tests first and run `pytest -q`.

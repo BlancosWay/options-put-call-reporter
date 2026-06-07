@@ -15,7 +15,7 @@ from reporter.config import ConfigError, load_config, load_symbol_file, symbols_
 from reporter.drift import build_drift
 from reporter.emailer import send_email_report
 from reporter.history import HistoryStore
-from reporter.keychain import get_password, set_password
+from reporter.keychain import KeychainError, get_password, set_password
 from reporter.models import EmailConfig, SymbolAnalysis, SymbolConfig, SymbolReport
 from reporter.reporting import render_reports
 
@@ -111,13 +111,12 @@ async def _run_async(args: argparse.Namespace) -> int:
         try:
             _progress("Sending email...")
             email_config = _load_email_config(args.email_config)
-            app_password = get_password(config.keychain_service, email_config.from_email)
+            api_key = get_password(config.keychain_service, email_config.from_email)
             subject_status = "FAILED" if not successes else "Partial" if failures else "Complete"
             send_email_report(
                 email_config=email_config,
-                smtp_host=config.gmail_smtp_host,
-                smtp_port=config.gmail_smtp_port,
-                app_password=app_password,
+                resend_api_url=config.resend_api_url,
+                api_key=api_key,
                 subject=f"{subject_status} Options Put/Call Report - {captured_at:%Y-%m-%d}",
                 html_path=bundle.html_path,
             )
@@ -132,12 +131,12 @@ async def _run_async(args: argparse.Namespace) -> int:
 
 def _setup_email(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    from_email = input("Gmail sender address: ").strip()
+    from_email = input("Resend sender address: ").strip()
     to_email = input("Report recipient address: ").strip()
-    password = getpass.getpass("Gmail App Password: ").strip()
+    api_key = getpass.getpass("Resend API key: ").strip()
     if not from_email or not to_email:
         raise ValueError("Sender and recipient email addresses are required")
-    set_password(config.keychain_service, from_email, password)
+    set_password(config.keychain_service, from_email, api_key)
     _write_email_config(args.email_config, EmailConfig(from_email=from_email, to_email=to_email))
     print(f"Email config written to {args.email_config}")
     return 0
@@ -167,7 +166,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "setup-email":
-        return _setup_email(args)
+        try:
+            return _setup_email(args)
+        except (ConfigError, KeychainError, OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     if args.command == "run":
         if args.symbols_file and args.symbols:
             print("Use either positional symbols or --symbols-file, not both", file=sys.stderr)

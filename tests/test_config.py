@@ -12,9 +12,8 @@ def write_config(path: Path, overrides: dict | None = None) -> None:
         "archive_dir": "archive",
         "database_path": "data/history.sqlite3",
         "report_time_local": "14:30",
-        "keychain_service": "options-put-call-reporter:gmail-app-password",
-        "gmail_smtp_host": "smtp.gmail.com",
-        "gmail_smtp_port": 587,
+        "keychain_service": "options-put-call-reporter:resend-api-key",
+        "resend_api_url": "https://api.resend.com/emails",
         "thresholds": {
             "strong_bullish_volume_max": 0.35,
             "strong_bullish_oi_max": 0.7,
@@ -27,11 +26,11 @@ def write_config(path: Path, overrides: dict | None = None) -> None:
             "neutral_volume_min": 0.7,
             "neutral_volume_max": 1.1,
             "neutral_oi_max": 1.1,
-            "min_total_volume_for_commentary": 1000
+            "min_total_volume_for_commentary": 1000,
         },
         "symbols": [
-            {"symbol": "NOW", "url": "https://www.barchart.com/stocks/quotes/now/put-call-ratios"}
-        ]
+            {"symbol": "META", "url": "https://www.barchart.com/stocks/quotes/meta/put-call-ratios"}
+        ],
     }
     if overrides:
         config.update(overrides)
@@ -54,8 +53,10 @@ def test_load_config_returns_typed_values(tmp_path: Path) -> None:
     assert config.archive_dir == Path("archive")
     assert config.database_path == Path("data/history.sqlite3")
     assert config.report_time_local == "14:30"
-    assert config.symbols[0].symbol == "NOW"
-    assert config.symbols[0].url == "https://www.barchart.com/stocks/quotes/now/put-call-ratios"
+    assert config.keychain_service == "options-put-call-reporter:resend-api-key"
+    assert config.resend_api_url == "https://api.resend.com/emails"
+    assert config.symbols[0].symbol == "META"
+    assert config.symbols[0].url == "https://www.barchart.com/stocks/quotes/meta/put-call-ratios"
     assert config.thresholds.strong_bullish_volume_max == 0.35
 
 
@@ -217,11 +218,27 @@ def test_load_config_rejects_duplicate_symbols_after_uppercase(tmp_path: Path) -
         load_config(config_path)
 
 
-def test_load_config_rejects_boolean_gmail_smtp_port(tmp_path: Path) -> None:
+def test_load_config_rejects_empty_resend_api_url(tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
-    write_config(config_path, {"gmail_smtp_port": True})
+    write_config(config_path, {"resend_api_url": ""})
 
-    with pytest.raises(ConfigError, match="integer"):
+    with pytest.raises(ConfigError, match="resend_api_url"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_non_https_resend_api_url(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(config_path, {"resend_api_url": "http://api.resend.com/emails"})
+
+    with pytest.raises(ConfigError, match="HTTPS URL"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_resend_api_url_without_hostname(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(config_path, {"resend_api_url": "https:///emails"})
+
+    with pytest.raises(ConfigError, match="HTTPS URL"):
         load_config(config_path)
 
 

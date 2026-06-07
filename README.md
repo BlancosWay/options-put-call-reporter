@@ -1,6 +1,6 @@
 # Options Put/Call Reporter
 
-Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool collects live options-expiration data, classifies monthly put/call signals, tracks historical drift, renders clean HTML/Markdown/CSV reports, and can optionally email the report through Gmail.
+Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool collects live options-expiration data, classifies monthly put/call signals, tracks historical drift, renders clean HTML/Markdown/CSV reports, and can optionally email the report through Resend.
 
 > Not financial advice. This project summarizes options sentiment data for research and automation. Verify all market data independently before making trading or investment decisions.
 
@@ -30,7 +30,7 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 - Reports disclose the data source used for each symbol.
 - Tracks history in SQLite and reports day/week/month drift where prior data exists.
 - Supports default symbols, terminal symbols, or a plain-text symbol file.
-- Sends Gmail reports using a macOS Keychain-stored app password.
+- Sends Resend email reports using a macOS Keychain-stored API key.
 - Includes launchd scheduling scripts for local daily runs on macOS.
 - Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
 
@@ -128,7 +128,7 @@ If Barchart collection fails for a symbol, the tool falls back to the free yfin.
 | Run default watchlist without email | `options-put-call-report run --no-email` |
 | Run selected symbols | `options-put-call-report run --no-email META MSFT NOW` |
 | Run symbols from a file | `options-put-call-report run --no-email --symbols-file watchlist.txt` |
-| Configure Gmail email | `options-put-call-report setup-email` |
+| Configure Resend email | `options-put-call-report setup-email` |
 | Run and send email | `options-put-call-report run --send-email` |
 | Install Playwright Chromium for pipx install | `python3 -m pipx run --spec playwright playwright install chromium` |
 | Install Playwright Chromium in a checkout | `python -m playwright install chromium` |
@@ -149,7 +149,7 @@ History is stored in `data/history.sqlite3`.
 
 ## Email setup
 
-Run the interactive setup command. It asks for sender email, recipient email, and a Gmail App Password. The app password is stored in macOS Keychain under `options-put-call-reporter:gmail-app-password`.
+Create a free Resend account, verify a sender identity or domain, and create a Resend API key. Then run the interactive setup command. It asks for the verified sender address, recipient email, and Resend API key. The API key is stored in macOS Keychain under `options-put-call-reporter:resend-api-key`.
 
 ```bash
 options-put-call-report setup-email
@@ -158,7 +158,16 @@ options-put-call-report run --send-email
 
 The local email config is written to `config/email.local.json`, which is intentionally ignored by git.
 
-If email was configured with an older version and Gmail login fails, re-run `options-put-call-report setup-email` so the app password is stored correctly in Keychain. Email failures include SMTP stage diagnostics like `stage=login`, the SMTP host/port, sender, recipient, and the safe exception type/message; the Gmail App Password is redacted.
+Older custom email configs created before Resend support need these email fields in `config/symbols.json` before running setup:
+
+```json
+"keychain_service": "options-put-call-reporter:resend-api-key",
+"resend_api_url": "https://api.resend.com/emails"
+```
+
+Keep your existing archive, database, threshold, and symbol settings.
+
+Email failures include Resend stage diagnostics like `stage=connect` or `stage=send`, the Resend endpoint, sender, recipient, HTTP status when available, and the safe exception type/message; the Resend API key is redacted.
 
 ## Scheduler
 
@@ -220,12 +229,12 @@ CI runs the test suite on Python 3.11 and 3.12 and builds the package.
 | Browser collection fails immediately | Playwright Chromium is missing | For pipx installs, run `python3 -m pipx run --spec playwright playwright install chromium`. In a checkout, run `python -m playwright install chromium`. |
 | Barchart collection fails for one symbol | Barchart page or network response failed | Inspect `archive/YYYY-MM-DD/{SYMBOL}-failure.html` and `{SYMBOL}-failure.png`; if fallback succeeds, also inspect `{SYMBOL}-yfin-raw.json`. |
 | Report uses yfin.dev fallback | Barchart failed and fallback succeeded | Check the report data-source disclosure and `{SYMBOL}-yfin-raw.json`; Barchart-only IV Rank/Percentile metrics may be unavailable. |
-| Email send fails | Gmail App Password, local recipient config, or Gmail SMTP authentication is invalid | Re-run `options-put-call-report setup-email`, confirm `config/email.local.json` exists locally, and inspect the SMTP stage in the error, for example `stage=login` for Gmail authentication failures. |
+| Email send fails | Resend API key, verified sender, local recipient config, or Resend API request is invalid | Re-run `options-put-call-report setup-email`, confirm `config/email.local.json` exists locally, verify the sender in Resend, and inspect the Resend stage/status in the error. |
 | Fresh install has no `config/symbols.json` | GitHub install uses packaged defaults | Run without a config file to use packaged defaults, or pass symbols in the terminal or via `--symbols-file`. |
 
 ## Security and privacy
 
-Do not commit `config/email.local.json`, Gmail app passwords, `archive/`, or `data/`. Generated archives can include local diagnostics and market snapshots.
+Do not commit `config/email.local.json`, Resend API keys, `archive/`, or `data`. Generated archives can include local diagnostics and market snapshots.
 
 ## License
 

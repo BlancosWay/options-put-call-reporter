@@ -62,7 +62,11 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "options-put-call-report run --no-email META MSFT NOW",
         "options-put-call-report setup-email",
         "Re-run `options-put-call-report setup-email`",
-        "Email failures include SMTP stage diagnostics like `stage=login`",
+        "Resend API key",
+        "Older custom email configs",
+        '"keychain_service": "options-put-call-reporter:resend-api-key"',
+        '"resend_api_url": "https://api.resend.com/emails"',
+        "Email failures include Resend stage diagnostics",
         "launchd",
         "Not financial advice",
         "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
@@ -84,6 +88,10 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "docs/MAINTENANCE.md",
     ]:
         assert text in readme
+
+    security = _read("SECURITY.md")
+    assert "data/history.sqlite3" not in security
+    assert "data/" in security
 
 
 def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
@@ -260,13 +268,60 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
         "Re-run `options-put-call-report setup-email`",
-        "stage=login",
+        "Resend API keys belong in macOS Keychain",
+        "Resend API keys should stay in macOS Keychain",
+        "stage=send",
     ]:
         assert text in combined
 
-    for native_file in ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"]:
+    assert "Resend API keys belong in macOS Keychain" in _read("AGENTS.md")
+    assert "Resend API keys should stay in macOS Keychain" in _read("assistant-pack/README.md")
+
+    assistant_pack_expectations = {
+        "assistant-pack/README.md": [
+            "Resend API keys",
+            "macOS Keychain",
+            "Never paste secrets into chat",
+            "stage=send",
+            "HTTP status",
+        ],
+        "assistant-pack/prompts/options-report-agent.md": [
+            "Resend API keys",
+            "macOS Keychain",
+            "Never ask users to paste Resend API keys into chat",
+            "stage=send",
+            "HTTP status",
+        ],
+        "assistant-pack/claude/options-put-call-reporter/SKILL.md": [
+            "Resend API keys",
+            "macOS Keychain",
+            "Never ask users to paste Resend API keys into chat",
+            "stage=send",
+            "HTTP status",
+        ],
+    }
+    for path, expected_texts in assistant_pack_expectations.items():
+        content = _read(path)
+        for text in expected_texts:
+            assert text in content, f"{path} missing {text}"
+
+    for native_file in [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        ".github/copilot-instructions.md",
+        ".github/instructions/options-reporter.instructions.md",
+    ]:
         content = _read(native_file)
         for text in ["config/symbols.json", "archive/YYYY-MM-DD", "data/history.sqlite3", "pytest -q", "python -m build", "Barchart"]:
+            assert text in content, f"{native_file} missing {text}"
+        for text in [
+            "Resend API keys",
+            "macOS Keychain",
+            "Never ask users to paste Resend API keys into chat",
+            "stage=send",
+            "HTTP status",
+        ]:
             assert text in content, f"{native_file} missing {text}"
 
 

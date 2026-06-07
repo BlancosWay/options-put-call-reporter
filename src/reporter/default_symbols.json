@@ -2,9 +2,8 @@
   "archive_dir": "archive",
   "database_path": "data/history.sqlite3",
   "report_time_local": "14:30",
-  "keychain_service": "options-put-call-reporter:gmail-app-password",
-  "gmail_smtp_host": "smtp.gmail.com",
-  "gmail_smtp_port": 587,
+  "keychain_service": "options-put-call-reporter:resend-api-key",
+  "resend_api_url": "https://api.resend.com/emails",
   "thresholds": {
     "strong_bullish_volume_max": 0.35,
     "strong_bullish_oi_max": 0.7,
