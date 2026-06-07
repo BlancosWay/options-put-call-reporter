@@ -168,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "setup-email":
         try:
             return _setup_email(args)
-        except (ConfigError, KeychainError, ValueError) as exc:
+        except (ConfigError, KeychainError, OSError, ValueError) as exc:
             print(str(exc), file=sys.stderr)
             return 2
     if args.command == "run":

@@ -542,3 +542,33 @@ def test_setup_email_prints_clear_keychain_error_without_traceback(monkeypatch, 
     assert "Unable to store email API key" in captured.err
     assert "Traceback" not in captured.err
     assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_prints_clear_config_write_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    stored: dict[str, str] = {}
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+    monkeypatch.setattr(
+        "reporter.cli.set_password",
+        lambda service, account, password: stored.update({"service": service, "account": account, "password": password}),
+    )
+    monkeypatch.setattr(
+        "reporter.cli._write_email_config",
+        lambda path, email_config: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "disk full" in captured.err
+    assert "Traceback" not in captured.err
+    assert stored == {
+        "service": "options-put-call-reporter:resend-api-key",
+        "account": "reports@example.com",
+        "password": "re_secret",
+    }
