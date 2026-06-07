@@ -1,8 +1,9 @@
-from email.message import EmailMessage
+import io
+import json
 from pathlib import Path
-import smtplib
 import subprocess
 import traceback
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -76,174 +77,119 @@ def test_set_password_raises_without_leaking_secret_in_exception_chain(monkeypat
     assert exc.value.__context__ is None
 
 
-def test_send_email_report_uses_tls_and_login(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_send_email_report_posts_html_to_resend(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     html_path = tmp_path / "report.html"
     html_path.write_text("<h1>Report</h1>", encoding="utf-8")
-    events: list[str] = []
-    tls_contexts: list[object] = []
-    sent_messages: list[EmailMessage] = []
+    requests = []
 
-    class FakeSMTP:
-        def __init__(self, host: str, port: int, *, timeout: float) -> None:
-            events.append(f"connect:{host}:{port}:timeout={timeout:g}")
+    class FakeResponse:
+        status = 200
 
         def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc, tb):
-            events.append("close")
+            return None
 
-        def starttls(self, *, context: object) -> None:
-            tls_contexts.append(context)
-            events.append("tls")
+        def read(self) -> bytes:
+            return b'{"id":"email_123"}'
 
-        def login(self, user: str, password: str) -> None:
-            events.append(f"login:{user}:{password}")
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeResponse()
 
-        def send_message(self, message: EmailMessage) -> None:
-            sent_messages.append(message)
-            events.append(f"send:{message['To']}")
-
-    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     send_email_report(
-        email_config=EmailConfig("sender@gmail.com", "recipient@gmail.com"),
-        smtp_host="smtp.gmail.com",
-        smtp_port=587,
-        app_password="abc123",
+        email_config=EmailConfig("reports@example.com", "recipient@example.com"),
+        resend_api_url="https://api.resend.com/emails",
+        api_key="re_secret",
         subject="Daily report",
         html_path=html_path,
     )
 
-    assert events == [
-        "connect:smtp.gmail.com:587:timeout=30",
-        "tls",
-        "login:sender@gmail.com:abc123",
-        "send:recipient@gmail.com",
-        "close",
-    ]
-    assert tls_contexts[0] is not None
-    assert len(sent_messages) == 1
-
-    message = sent_messages[0]
-    assert message["From"] == "sender@gmail.com"
-    assert message["To"] == "recipient@gmail.com"
-    assert message["Subject"] == "Daily report"
-
-    plain_body = message.get_body(preferencelist=("plain",))
-    assert plain_body is not None
-    assert "Daily options put/call report" in plain_body.get_content()
-
-    html_body = message.get_body(preferencelist=("html",))
-    assert html_body is not None
-    assert "<h1>Report</h1>" in html_body.get_content()
+    request, timeout = requests[0]
+    assert timeout == 30
+    assert request.full_url == "https://api.resend.com/emails"
+    assert request.get_method() == "POST"
+    assert request.headers["Authorization"] == "Bearer re_secret"
+    assert request.headers["Content-type"] == "application/json"
+    payload = json.loads(request.data.decode("utf-8"))
+    assert payload == {
+        "from": "reports@example.com",
+        "to": ["recipient@example.com"],
+        "subject": "Daily report",
+        "html": "<h1>Report</h1>",
+        "text": "Daily options put/call report is attached as HTML content.",
+    }
 
 
-def test_send_email_report_failure_includes_smtp_stage_and_safe_diagnostics(
+def test_send_email_report_http_failure_includes_safe_resend_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     html_path = tmp_path / "report.html"
     html_path.write_text("<h1>Report</h1>", encoding="utf-8")
+    api_key = "re_super_secret"
 
-    class FakeSMTP:
-        def __init__(self, host: str, port: int, *, timeout: float) -> None:
-            self.host = host
-            self.port = port
-            self.timeout = timeout
+    def fake_urlopen(request, timeout):
+        raise HTTPError(
+            url=request.full_url,
+            code=403,
+            msg=f"forbidden {api_key}",
+            hdrs={},
+            fp=io.BytesIO(f'{{"message":"bad key {api_key}"}}'.encode("utf-8")),
+        )
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return None
-
-        def starttls(self, *, context: object) -> None:
-            return None
-
-        def login(self, user: str, password: str) -> None:
-            raise smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
-
-    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     with pytest.raises(EmailError) as exc:
         send_email_report(
-            email_config=EmailConfig("sender@gmail.com", "recipient@gmail.com"),
-            smtp_host="smtp.gmail.com",
-            smtp_port=587,
-            app_password="super-secret-app-password",
+            email_config=EmailConfig("reports@example.com", "recipient@example.com"),
+            resend_api_url="https://api.resend.com/emails",
+            api_key=api_key,
             subject="Daily report",
             html_path=html_path,
         )
 
     message = str(exc.value)
-    assert "Failed to send report email to recipient@gmail.com" in message
-    assert "stage=login" in message
-    assert "smtp=smtp.gmail.com:587" in message
-    assert "from=sender@gmail.com" in message
-    assert "to=recipient@gmail.com" in message
-    assert "SMTPAuthenticationError" in message
-    assert "Username and Password not accepted" in message
-    assert "super-secret-app-password" not in message
+    assert "Failed to send report email to recipient@example.com" in message
+    assert "stage=send" in message
+    assert "resend=https://api.resend.com/emails" in message
+    assert "status=403" in message
+    assert "from=reports@example.com" in message
+    assert "to=recipient@example.com" in message
+    assert "<redacted>" in message
+    assert api_key not in message
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
 
 
-@pytest.mark.parametrize(
-    ("failure_stage", "expected_stage"),
-    [
-        ("connect", "connect"),
-        ("starttls", "starttls"),
-        ("login", "login"),
-        ("send", "send"),
-    ],
-)
-def test_send_email_report_failure_diagnostics_cover_all_smtp_stages_without_leaking_secret(
+def test_send_email_report_url_failure_does_not_leak_api_key(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    failure_stage: str,
-    expected_stage: str,
 ) -> None:
     html_path = tmp_path / "report.html"
     html_path.write_text("<h1>Report</h1>", encoding="utf-8")
-    app_password = "super-secret-app-password"
+    api_key = "re_super_secret"
 
-    class FakeSMTP:
-        def __init__(self, host: str, port: int, *, timeout: float) -> None:
-            if failure_stage == "connect":
-                raise OSError(f"connect failed with {app_password}")
+    def fake_urlopen(request, timeout):
+        raise URLError(f"network failed {api_key}")
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return None
-
-        def starttls(self, *, context: object) -> None:
-            if failure_stage == "starttls":
-                raise smtplib.SMTPException(f"tls failed with {app_password}")
-
-        def login(self, user: str, password: str) -> None:
-            if failure_stage == "login":
-                raise smtplib.SMTPAuthenticationError(535, f"login failed with {password}".encode())
-
-        def send_message(self, message: EmailMessage) -> None:
-            if failure_stage == "send":
-                raise smtplib.SMTPException(f"send failed with {app_password}")
-
-    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     with pytest.raises(EmailError) as exc:
         send_email_report(
-            email_config=EmailConfig("sender@gmail.com", "recipient@gmail.com"),
-            smtp_host="smtp.gmail.com",
-            smtp_port=587,
-            app_password=app_password,
+            email_config=EmailConfig("reports@example.com", "recipient@example.com"),
+            resend_api_url="https://api.resend.com/emails",
+            api_key=api_key,
             subject="Daily report",
             html_path=html_path,
         )
 
     traceback_text = "".join(traceback.format_exception(exc.value))
-    assert f"stage={expected_stage}" in str(exc.value)
-    assert app_password not in str(exc.value)
-    assert app_password not in traceback_text
+    assert "stage=connect" in str(exc.value)
+    assert api_key not in str(exc.value)
+    assert api_key not in traceback_text
     assert exc.value.__cause__ is None
     assert exc.value.__context__ is None
