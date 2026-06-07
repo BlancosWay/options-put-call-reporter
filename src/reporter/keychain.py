@@ -35,6 +35,13 @@ def _keyring_read_error_message() -> str:
     )
 
 
+def _safe_exception_detail(exc: Exception, secret: str) -> str:
+    message = str(exc).replace(secret, "<secret omitted>")
+    if message:
+        return f"{exc.__class__.__name__}: {message}"
+    return exc.__class__.__name__
+
+
 def get_password(service: str, account: str) -> str:
     env_secret = os.environ.get(RESEND_API_KEY_ENV)
     if env_secret is not None:
@@ -77,12 +84,14 @@ def set_password(service: str, account: str, password: str) -> None:
     secret = _trim_secret(password)
     if not secret:
         raise KeychainError("Cannot store an empty email API key in the system keyring")
-    storage_failed = False
+    storage_error = None
     try:
         keyring.set_password(service, account, secret)
-    except Exception:
-        storage_failed = True
-    if storage_failed:
+    except Exception as exc:
+        storage_error = exc
+    if storage_error:
+        detail = _safe_exception_detail(storage_error, secret)
         raise KeychainError(
-            f"Unable to store email API key in the system keyring for account '{account}'"
+            f"Unable to store email API key in the system keyring for account '{account}'. "
+            f"Keyring error: {detail}"
         ) from None

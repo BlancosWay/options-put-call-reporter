@@ -4,7 +4,6 @@ from pathlib import Path
 
 from reporter.cli import main
 from reporter.history import HistoryStore
-from reporter.keychain import KeychainError
 from reporter.models import EmailConfig, ExpirationRow, Snapshot, SymbolConfig, TopMetrics
 
 
@@ -533,16 +532,19 @@ def test_setup_email_prints_clear_keychain_error_without_traceback(monkeypatch, 
 
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
     monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
-    monkeypatch.setattr(
-        "reporter.cli.set_password",
-        lambda service, account, password: (_ for _ in ()).throw(KeychainError("Unable to store email API key")),
-    )
+
+    def fake_set_password(service: str, account: str, password: str) -> None:
+        raise RuntimeError(f"backend denied access to {password}")
+
+    monkeypatch.setattr("reporter.keychain.keyring.set_password", fake_set_password)
 
     exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
 
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "Unable to store email API key" in captured.err
+    assert "Keyring error: RuntimeError: backend denied access to <secret omitted>" in captured.err
+    assert "re_secret" not in captured.err
     assert "Traceback" not in captured.err
     assert not (tmp_path / "email.local.json").exists()
 

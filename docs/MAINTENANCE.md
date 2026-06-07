@@ -117,3 +117,5 @@ Update `README.md` when CLI usage, outputs, install steps, data-source behavior,
 Update `docs/ARCHITECTURE.md` when module responsibilities, data flow, persistence, or report outputs change.
 
 Update assistant docs when commands, safety rules, or repo layout changes.
+
+For keyring setup failures, `setup-email` prints a sanitized `Keyring error:` detail that includes the underlying Python `keyring` exception class and message while omitting the Resend API key. Use that detail to diagnose locked or unavailable desktop keyrings, and recommend `RESEND_API_KEY` or `RESEND_API_KEY_FILE` when keyring storage is not practical.
