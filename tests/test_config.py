@@ -53,6 +53,8 @@ def test_load_config_returns_typed_values(tmp_path: Path) -> None:
     assert config.archive_dir == Path("archive")
     assert config.database_path == Path("data/history.sqlite3")
     assert config.report_time_local == "14:30"
+    assert config.keychain_service == "options-put-call-reporter:resend-api-key"
+    assert config.resend_api_url == "https://api.resend.com/emails"
     assert config.symbols[0].symbol == "META"
     assert config.symbols[0].url == "https://www.barchart.com/stocks/quotes/meta/put-call-ratios"
     assert config.thresholds.strong_bullish_volume_max == 0.35
@@ -221,6 +223,14 @@ def test_load_config_rejects_empty_resend_api_url(tmp_path: Path) -> None:
     write_config(config_path, {"resend_api_url": ""})
 
     with pytest.raises(ConfigError, match="resend_api_url"):
+        load_config(config_path)
+
+
+def test_load_config_rejects_non_https_resend_api_url(tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    write_config(config_path, {"resend_api_url": "http://api.resend.com/emails"})
+
+    with pytest.raises(ConfigError, match="HTTPS URL"):
         load_config(config_path)
 
 

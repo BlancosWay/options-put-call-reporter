@@ -25,6 +25,14 @@ def _require_string(data: dict[str, Any], key: str) -> str:
     return value
 
 
+def _require_https_url(data: dict[str, Any], key: str) -> str:
+    value = _require_string(data, key)
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or parsed.hostname is None:
+        raise ConfigError(f"Config value '{key}' must be an HTTPS URL")
+    return value
+
+
 def _thresholds(data: dict[str, Any]) -> Thresholds:
     raw = data.get("thresholds")
     if not isinstance(raw, dict):
@@ -128,7 +136,7 @@ def _config_from_data(data: Any) -> AppConfig:
         database_path=Path(_require_string(data, "database_path")),
         report_time_local=_require_string(data, "report_time_local"),
         keychain_service=_require_string(data, "keychain_service"),
-        resend_api_url=_require_string(data, "resend_api_url"),
+        resend_api_url=_require_https_url(data, "resend_api_url"),
         thresholds=_thresholds(data),
         symbols=_symbols(data),
     )
