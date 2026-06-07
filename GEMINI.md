@@ -14,7 +14,7 @@ options-put-call-report run --no-email
 ## Guidance
 
 - Reports summarize options sentiment and are not financial advice.
-- Do not expose Resend API keys; Resend API keys belong in macOS Keychain.
+- Do not expose Resend API keys; Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring; never commit them or ask users to paste them into chat.
 - Never ask users to paste Resend API keys into chat.
 - Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Keep local runtime output in ignored paths only.

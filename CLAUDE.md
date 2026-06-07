@@ -4,7 +4,7 @@ Use this project as a Python CLI/package. Follow TDD for behavior changes and ru
 
 ## Project context
 
-`options-put-call-report` collects Barchart put/call ratio data with Playwright, analyzes monthly sentiment, stores SQLite history, renders reports, and can send Resend email through macOS Keychain.
+`options-put-call-report` collects Barchart put/call ratio data with Playwright, analyzes monthly sentiment, stores SQLite history, renders reports, and can send Resend email using environment, secret-file, or system-keyring credentials.
 
 ## Locations
 
@@ -24,7 +24,7 @@ Run `pytest -q` and `python -m build`.
 ## Maintenance rules
 
 - Keep generated files out of git: `archive/`, `data/`, `config/email.local.json`.
-- Resend API keys belong in macOS Keychain.
+- Resend API keys belong in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring; never commit them or ask users to paste them into chat.
 - Never ask users to paste Resend API keys into chat.
 - Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Use `python -m playwright install chromium` when browser collection fails.

@@ -30,7 +30,7 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 - Reports disclose the data source used for each symbol.
 - Tracks history in SQLite and reports day/week/month drift where prior data exists.
 - Supports default symbols, terminal symbols, or a plain-text symbol file.
-- Sends Resend email reports using a macOS Keychain-stored API key.
+- Sends Resend email reports using a key from the environment, a secret file, or the system keyring.
 - Includes launchd scheduling scripts for local daily runs on macOS.
 - Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.
 
@@ -149,14 +149,41 @@ History is stored in `data/history.sqlite3`.
 
 ## Email setup
 
-Create a free Resend account, verify a sender identity or domain, and create a Resend API key. Then run the interactive setup command. It asks for the verified sender address, recipient email, and Resend API key. The API key is stored in macOS Keychain under `options-put-call-reporter:resend-api-key`.
+Create a free Resend account, verify a sender identity or domain, and create a Resend API key. The report can find that key from these sources, in order:
+
+1. `RESEND_API_KEY` environment variable.
+2. `RESEND_API_KEY_FILE`, a file containing only the API key.
+3. The system keyring through Python `keyring`.
+
+Use the interactive setup on desktop machines:
 
 ```bash
 options-put-call-report setup-email
 options-put-call-report run --send-email
 ```
 
-The local email config is written to `config/email.local.json`, which is intentionally ignored by git.
+The setup command asks for the verified sender address, recipient email, and Resend API key. It writes only sender/recipient metadata to `config/email.local.json` and stores the API key in the system keyring: macOS Keychain, Windows Credential Manager, or Linux Secret Service/KWallet.
+
+For Linux servers, containers, and CI, prefer environment variables or a mounted secret file:
+
+```bash
+export RESEND_API_KEY="re_..."
+options-put-call-report run --send-email
+
+printf '%s\n' "$RESEND_API_KEY" > ~/.config/options-put-call-report/resend-api-key
+chmod 600 ~/.config/options-put-call-report/resend-api-key
+export RESEND_API_KEY_FILE=~/.config/options-put-call-report/resend-api-key
+options-put-call-report run --send-email
+```
+
+| Environment | Install | Setup | Maintenance |
+| --- | --- | --- | --- |
+| macOS desktop | `python3.11 -m venv .venv && ./.venv/bin/python -m pip install -e ".[dev]"` | Run `options-put-call-report setup-email`; keyring stores in macOS Keychain. | Re-run setup when rotating Resend keys; use Keychain Access to delete stale entries. |
+| Windows desktop | Create a Python 3.11+ venv, then `python -m pip install -e ".[dev]"`. | Run `options-put-call-report setup-email`; keyring stores in Windows Credential Manager. | Re-run setup when rotating keys; remove stale credentials from Credential Manager. |
+| Linux desktop | Install Python 3.11+, package deps, and a Secret Service/KWallet backend such as GNOME Keyring or KWallet; then install the package. | Run `options-put-call-report setup-email` in an unlocked desktop session. | If keyring is locked/unavailable, unlock the desktop keyring or use env/file fallback. |
+| Linux headless/server | Install Python 3.11+ and the package. | Set `RESEND_API_KEY` or `RESEND_API_KEY_FILE`; do not require a desktop keyring. | Rotate the host secret and restart the scheduler/process. |
+| Docker/Kubernetes | Install package in the image. | Mount the Resend key as a secret file and set `RESEND_API_KEY_FILE`. | Rotate the orchestrator secret and restart workloads. |
+| GitHub Actions | Install with `python -m pip install -e ".[dev]"`. | Store the key in repository/environment secrets and expose it as `RESEND_API_KEY`. | Rotate GitHub secret; never print it in logs. |
 
 Older custom email configs created before Resend support need these email fields in `config/symbols.json` before running setup:
 
