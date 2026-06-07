@@ -182,7 +182,7 @@ def test_set_password_rejects_whitespace_only_email_api_key() -> None:
         set_password("service", "reports@example.com", "   ")
 
 
-def test_set_password_normalizes_keyring_failure_without_leaking_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_set_password_reports_keyring_failure_details_without_leaking_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "re_secret_value"
 
     def fake_set_password(service: str, account: str, password: str) -> None:
@@ -196,6 +196,7 @@ def test_set_password_normalizes_keyring_failure_without_leaking_secret(monkeypa
     ) as exc:
         set_password("service", "reports@example.com", secret)
 
+    assert "RuntimeError: backend failed for <secret omitted>" in str(exc.value)
     assert secret not in str(exc.value)
     assert exc.value.__cause__ is None
     assert exc.value.__context__ is None
