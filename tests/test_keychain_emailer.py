@@ -61,7 +61,23 @@ def test_get_password_raises_clear_error(monkeypatch: pytest.MonkeyPatch) -> Non
 
     monkeypatch.setattr("subprocess.run", fake_run)
 
-    with pytest.raises(KeychainError, match="Keychain"):
+    with pytest.raises(
+        KeychainError,
+        match="Email API key not found in Keychain for account 'user@example.com'",
+    ):
+        get_password("service", "user@example.com")
+
+
+def test_get_password_raises_email_api_key_error_for_empty_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(args, check, capture_output, text):
+        return Completed(stdout="\n")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(
+        KeychainError,
+        match="Keychain returned an empty email API key for account 'user@example.com'",
+    ):
         get_password("service", "user@example.com")
 
 

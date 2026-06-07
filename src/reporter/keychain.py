@@ -15,11 +15,11 @@ def get_password(service: str, account: str) -> str:
             capture_output=True,
             text=True,
         )
-    except Exception as exc:
-        raise KeychainError(f"Keychain password not found for account '{account}' and service '{service}'") from exc
+    except Exception:
+        raise KeychainError(f"Email API key not found in Keychain for account '{account}'") from None
     password = completed.stdout.strip()
     if not password:
-        raise KeychainError(f"Keychain returned an empty password for account '{account}' and service '{service}'")
+        raise KeychainError(f"Keychain returned an empty email API key for account '{account}'")
     return password
 
 
