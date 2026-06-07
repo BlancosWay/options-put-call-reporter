@@ -274,9 +274,23 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
     assert "Resend API keys belong in macOS Keychain" in _read("AGENTS.md")
     assert "Resend API keys should stay in macOS Keychain" in _read("assistant-pack/README.md")
 
-    for native_file in ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"]:
+    for native_file in [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        ".github/copilot-instructions.md",
+        ".github/instructions/options-reporter.instructions.md",
+    ]:
         content = _read(native_file)
         for text in ["config/symbols.json", "archive/YYYY-MM-DD", "data/history.sqlite3", "pytest -q", "python -m build", "Barchart"]:
+            assert text in content, f"{native_file} missing {text}"
+        for text in [
+            "Resend API keys",
+            "macOS Keychain",
+            "Never ask users to paste Resend API keys into chat",
+            "stage=send",
+            "HTTP status",
+        ]:
             assert text in content, f"{native_file} missing {text}"
 
 
