@@ -28,6 +28,13 @@ def _missing_secret_message(account: str) -> str:
     )
 
 
+def _keyring_read_error_message() -> str:
+    return (
+        f"Unable to read the system keyring. Set {RESEND_API_KEY_ENV}, "
+        f"set {RESEND_API_KEY_FILE_ENV}, or configure a working keyring backend."
+    )
+
+
 def get_password(service: str, account: str) -> str:
     env_secret = os.environ.get(RESEND_API_KEY_ENV)
     if env_secret is not None:
@@ -39,29 +46,40 @@ def get_password(service: str, account: str) -> str:
     key_file = os.environ.get(RESEND_API_KEY_FILE_ENV)
     if key_file is not None:
         path = Path(key_file).expanduser()
+        read_failed = False
+        secret_text = None
         try:
-            secret = _trim_secret(path.read_text(encoding="utf-8"))
+            secret_text = path.read_text(encoding="utf-8")
         except OSError:
-            raise KeychainError(f"{RESEND_API_KEY_FILE_ENV} could not be read: {path}") from None
+            read_failed = True
+        if read_failed:
+            raise KeychainError(f"{RESEND_API_KEY_FILE_ENV} is set but could not be read") from None
+        secret = _trim_secret(secret_text)
         if not secret:
-            raise KeychainError(f"{RESEND_API_KEY_FILE_ENV} is empty: {path}")
+            raise KeychainError(f"{RESEND_API_KEY_FILE_ENV} points to an empty file")
         return secret
 
+    keyring_failed = False
+    keyring_secret = None
     try:
-        secret = _trim_secret(keyring.get_password(service, account))
+        keyring_secret = keyring.get_password(service, account)
     except Exception:
-        raise KeychainError(_missing_secret_message(account)) from None
+        keyring_failed = True
+    if keyring_failed:
+        raise KeychainError(_keyring_read_error_message()) from None
+    secret = _trim_secret(keyring_secret)
     if not secret:
         raise KeychainError(_missing_secret_message(account))
     return secret
 
 
 def set_password(service: str, account: str, password: str) -> None:
-    if not password:
+    secret = _trim_secret(password)
+    if not secret:
         raise KeychainError("Cannot store an empty email API key in the system keyring")
     storage_failed = False
     try:
-        keyring.set_password(service, account, password)
+        keyring.set_password(service, account, secret)
     except Exception:
         storage_failed = True
     if storage_failed:
