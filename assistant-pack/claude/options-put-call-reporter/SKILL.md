@@ -32,5 +32,6 @@ options-put-call-report setup-email
 - Treat output as options-sentiment research, not financial advice.
 - Never ask users to paste Gmail App Passwords into chat.
 - Use macOS Keychain via `setup-email`.
+- Re-run `options-put-call-report setup-email` if Gmail authentication fails after an older setup; email failure logs include SMTP stage diagnostics such as `stage=login`.
 - Keep `archive/`, `data/`, and `config/email.local.json` out of git.
 - When changing code, write tests first and run `pytest -q`.

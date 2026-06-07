@@ -33,7 +33,7 @@ def set_password(service: str, account: str, password: str) -> None:
             check=True,
             capture_output=True,
             text=True,
-            input=f"{password}\n",
+            input=f"{password}\n{password}\n",
         )
     except Exception:
         failed = True
