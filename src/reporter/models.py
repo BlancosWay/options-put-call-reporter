@@ -44,8 +44,7 @@ class AppConfig:
     database_path: Path
     report_time_local: str
     keychain_service: str
-    gmail_smtp_host: str
-    gmail_smtp_port: int
+    resend_api_url: str
     thresholds: Thresholds
     symbols: list[SymbolConfig]
 

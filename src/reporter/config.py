@@ -25,13 +25,6 @@ def _require_string(data: dict[str, Any], key: str) -> str:
     return value
 
 
-def _require_int(data: dict[str, Any], key: str) -> int:
-    value = data.get(key)
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise ConfigError(f"Config value '{key}' must be an integer")
-    return value
-
-
 def _thresholds(data: dict[str, Any]) -> Thresholds:
     raw = data.get("thresholds")
     if not isinstance(raw, dict):
@@ -135,8 +128,7 @@ def _config_from_data(data: Any) -> AppConfig:
         database_path=Path(_require_string(data, "database_path")),
         report_time_local=_require_string(data, "report_time_local"),
         keychain_service=_require_string(data, "keychain_service"),
-        gmail_smtp_host=_require_string(data, "gmail_smtp_host"),
-        gmail_smtp_port=_require_int(data, "gmail_smtp_port"),
+        resend_api_url=_require_string(data, "resend_api_url"),
         thresholds=_thresholds(data),
         symbols=_symbols(data),
     )
