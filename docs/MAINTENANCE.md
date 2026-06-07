@@ -63,7 +63,7 @@ The repository allows GitHub native auto-merge and delete-branch-on-merge. `.git
 - The PR is not a draft.
 - `dependabot/fetch-metadata` reports `version-update:semver-patch` or `version-update:semver-minor`.
 
-By policy, major updates remain manual. If a Dependabot auto-merge job is skipped, inspect the run and metadata:
+By policy, major updates remain manual. If an auto-merge job is skipped, inspect the run and metadata:
 
 ### Owner auto-merge
 

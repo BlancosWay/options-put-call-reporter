@@ -183,7 +183,7 @@ git --no-pager diff -- .github/workflows/dependabot-auto-merge.yml tests/test_pu
 
 Expected: only workflow policy, documentation, tests, and plan files changed.
 
-- [ ] **Step 3: Commit the owner auto-merge change**
+- [x] **Step 3: Commit the owner auto-merge change**
 
 Run:
 
@@ -192,7 +192,7 @@ git add .github/workflows/dependabot-auto-merge.yml tests/test_publication_asset
 git commit -m "ci: auto-merge owner pull requests" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-- [ ] **Step 4: Request code review**
+- [x] **Step 4: Request code review**
 
 Use `superpowers:requesting-code-review` on the branch diff against `origin/main`. Review focus:
 
