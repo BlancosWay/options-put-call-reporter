@@ -4,6 +4,7 @@ from pathlib import Path
 
 from reporter.cli import main
 from reporter.history import HistoryStore
+from reporter.keychain import KeychainError
 from reporter.models import EmailConfig, ExpirationRow, Snapshot, SymbolConfig, TopMetrics
 
 
@@ -487,3 +488,57 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
     }
     email_config = json.loads((tmp_path / "email.local.json").read_text(encoding="utf-8"))
     assert email_config == {"from_email": "reports@example.com", "to_email": "recipient@example.com"}
+
+
+def test_setup_email_prints_clear_config_error_without_traceback(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    del config_data["resend_api_url"]
+    config_path.write_text(json.dumps(config_data), encoding="utf-8")
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "resend_api_url" in captured.err
+    assert "Traceback" not in captured.err
+    assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_prints_clear_validation_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    answers = iter(["", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Sender and recipient email addresses are required" in captured.err
+    assert "Traceback" not in captured.err
+    assert not (tmp_path / "email.local.json").exists()
+
+
+def test_setup_email_prints_clear_keychain_error_without_traceback(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+    answers = iter(["reports@example.com", "recipient@example.com"])
+
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt: "re_secret")
+    monkeypatch.setattr(
+        "reporter.cli.set_password",
+        lambda service, account, password: (_ for _ in ()).throw(KeychainError("Unable to store email API key")),
+    )
+
+    exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "Unable to store email API key" in captured.err
+    assert "Traceback" not in captured.err
+    assert not (tmp_path / "email.local.json").exists()

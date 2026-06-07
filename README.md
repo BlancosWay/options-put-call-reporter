@@ -158,6 +158,15 @@ options-put-call-report run --send-email
 
 The local email config is written to `config/email.local.json`, which is intentionally ignored by git.
 
+Older custom email configs created before Resend support need these email fields in `config/symbols.json` before running setup:
+
+```json
+"keychain_service": "options-put-call-reporter:resend-api-key",
+"resend_api_url": "https://api.resend.com/emails"
+```
+
+Keep your existing archive, database, threshold, and symbol settings.
+
 Email failures include Resend stage diagnostics like `stage=connect` or `stage=send`, the Resend endpoint, sender, recipient, HTTP status when available, and the safe exception type/message; the Resend API key is redacted.
 
 ## Scheduler

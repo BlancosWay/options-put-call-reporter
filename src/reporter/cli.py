@@ -15,7 +15,7 @@ from reporter.config import ConfigError, load_config, load_symbol_file, symbols_
 from reporter.drift import build_drift
 from reporter.emailer import send_email_report
 from reporter.history import HistoryStore
-from reporter.keychain import get_password, set_password
+from reporter.keychain import KeychainError, get_password, set_password
 from reporter.models import EmailConfig, SymbolAnalysis, SymbolConfig, SymbolReport
 from reporter.reporting import render_reports
 
@@ -166,7 +166,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "setup-email":
-        return _setup_email(args)
+        try:
+            return _setup_email(args)
+        except (ConfigError, KeychainError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     if args.command == "run":
         if args.symbols_file and args.symbols:
             print("Use either positional symbols or --symbols-file, not both", file=sys.stderr)
