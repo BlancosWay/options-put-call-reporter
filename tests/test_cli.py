@@ -328,12 +328,17 @@ def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: P
         encoding="utf-8",
     )
     sent: dict[str, object] = {}
+    keychain_lookups: list[tuple[str, str]] = []
 
     async def fake_collect(symbol_config, captured_at, archive_dir):
         return _sample_snapshot(symbol_config, captured_at, archive_dir)
 
+    def fake_get_password(service, account):
+        keychain_lookups.append((service, account))
+        return "re_secret"
+
     monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
-    monkeypatch.setattr("reporter.cli.get_password", lambda service, account: "re_secret")
+    monkeypatch.setattr("reporter.cli.get_password", fake_get_password)
     monkeypatch.setattr(
         "reporter.cli.send_email_report",
         lambda **kwargs: sent.update(kwargs),
@@ -351,6 +356,7 @@ def test_run_send_email_loads_keychain_and_sends_report(monkeypatch, tmp_path: P
     ])
 
     assert exit_code == 0
+    assert keychain_lookups == [("options-put-call-reporter:resend-api-key", "reports@example.com")]
     assert sent["email_config"] == EmailConfig("reports@example.com", "recipient@example.com")
     assert sent["resend_api_url"] == "https://api.resend.com/emails"
     assert sent["api_key"] == "re_secret"
@@ -451,9 +457,19 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
     _config(config_path)
     stored: dict[str, str] = {}
     answers = iter(["reports@example.com", "recipient@example.com", "re_secret"])
+    input_prompts: list[str] = []
+    getpass_prompts: list[str] = []
 
-    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
-    monkeypatch.setattr("getpass.getpass", lambda prompt: next(answers))
+    def fake_input(prompt):
+        input_prompts.append(prompt)
+        return next(answers)
+
+    def fake_getpass(prompt):
+        getpass_prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("getpass.getpass", fake_getpass)
     monkeypatch.setattr(
         "reporter.cli.set_password",
         lambda service, account, password: stored.update({"service": service, "account": account, "password": password}),
@@ -462,6 +478,8 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
     exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
 
     assert exit_code == 0
+    assert input_prompts == ["Resend sender address: ", "Report recipient address: "]
+    assert getpass_prompts == ["Resend API key: "]
     assert stored == {
         "service": "options-put-call-reporter:resend-api-key",
         "account": "reports@example.com",
