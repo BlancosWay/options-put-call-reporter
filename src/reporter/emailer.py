@@ -59,6 +59,7 @@ def send_email_report(
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "User-Agent": "options-put-call-reporter/0.1.0",
         },
         method="POST",
     )
