@@ -101,6 +101,40 @@ def test_get_password_rejects_unreadable_key_file_without_leaking_env_value(
     assert "secret-re_path-value" not in str(exc.value)
 
 
+def test_get_password_rejects_invalid_utf8_key_file_without_leaking_env_value(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    secret_file = tmp_path / "secret-re_invalid_utf8"
+    secret_file.write_bytes(b"re_valid_prefix_\xff\xfe\n")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY_FILE", str(secret_file))
+
+    with pytest.raises(KeychainError, match="RESEND_API_KEY_FILE is set but could not be read") as exc:
+        get_password("service", "user@example.com")
+
+    assert str(secret_file) not in str(exc.value)
+    assert "secret-re_invalid_utf8" not in str(exc.value)
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
+def test_get_password_treats_empty_keyring_secret_as_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY_FILE", raising=False)
+    monkeypatch.setattr("reporter.keychain.keyring.get_password", lambda service, account: "")
+
+    with pytest.raises(
+        KeychainError,
+        match="Set RESEND_API_KEY, set RESEND_API_KEY_FILE, or run setup-email",
+    ) as exc:
+        get_password("service", "user@example.com")
+
+    assert "user@example.com" in str(exc.value)
+    assert exc.value.__cause__ is None
+    assert exc.value.__context__ is None
+
+
 def test_get_password_keyring_read_failure_is_sanitized(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "re_secret_from_backend_error"
 

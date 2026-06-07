@@ -164,14 +164,21 @@ options-put-call-report run --send-email
 
 The setup command asks for the verified sender address, recipient email, and Resend API key. It writes only sender/recipient metadata to `config/email.local.json` and stores the API key in the system keyring: macOS Keychain, Windows Credential Manager, or Linux Secret Service/KWallet.
 
-For Linux servers, containers, and CI, prefer environment variables or a mounted secret file:
+For CI and secret-manager injection, expose the key as an environment variable without typing the secret into a shell command:
 
 ```bash
 export RESEND_API_KEY="re_..."
 options-put-call-report run --send-email
+```
 
+For Linux servers and containers, prefer a mounted secret file. If you need to create one interactively, read the key without echoing it and clear the temporary shell variable after writing the file:
+
+```bash
 mkdir -p ~/.config/options-put-call-report
+read -r -s -p "Resend API key: " RESEND_API_KEY
+printf '\n'
 printf '%s\n' "$RESEND_API_KEY" > ~/.config/options-put-call-report/resend-api-key
+unset RESEND_API_KEY
 chmod 600 ~/.config/options-put-call-report/resend-api-key
 export RESEND_API_KEY_FILE=~/.config/options-put-call-report/resend-api-key
 options-put-call-report run --send-email
@@ -183,7 +190,7 @@ The key source only provides the Resend secret. Every `run --send-email` invocat
 | --- | --- | --- | --- |
 | macOS desktop | `python3.11 -m venv .venv && ./.venv/bin/python -m pip install -e ".[dev]"` | Run `options-put-call-report setup-email`; keyring stores in macOS Keychain. | Re-run setup when rotating Resend keys; use Keychain Access to delete stale entries. |
 | Windows desktop | Create a Python 3.11+ venv, then `python -m pip install -e ".[dev]"`. | Run `options-put-call-report setup-email`; keyring stores in Windows Credential Manager. | Re-run setup when rotating keys; remove stale credentials from Credential Manager. |
-| Linux desktop | Install Python 3.11+, package deps, and a Secret Service/KWallet backend such as GNOME Keyring or KWallet; then install the package. | Run `options-put-call-report setup-email` in an unlocked desktop session. | If keyring is locked/unavailable, unlock the desktop keyring or use env/file fallback. |
+| Linux desktop | Install Python 3.11+, package deps, and a Secret Service/KWallet backend such as GNOME Keyring or KWallet; then install the package. The backend must be installed, running, unlocked, and discoverable by Python `keyring`. | Run `options-put-call-report setup-email` in an unlocked desktop session. | If keyring is locked/unavailable, unlock the desktop keyring or use env/file fallback. |
 | Linux headless/server | Install Python 3.11+ and the package. | Set `RESEND_API_KEY` or `RESEND_API_KEY_FILE`; also provide `config/email.local.json` or `--email-config` with `from_email` and `to_email`. | Rotate the host secret and restart the scheduler/process. |
 | Docker/Kubernetes | Install package in the image. | Mount the Resend key as a secret file and set `RESEND_API_KEY_FILE`; also mount an email metadata JSON and pass `--email-config` if it is not at `config/email.local.json`. | Rotate the orchestrator secret and restart workloads. |
 | GitHub Actions | Install with `python -m pip install -e ".[dev]"`. | Store the key in repository/environment secrets and expose it as `RESEND_API_KEY`; create `config/email.local.json` or pass `--email-config` with `from_email` and `to_email`. | Rotate GitHub secret; never print it in logs. |

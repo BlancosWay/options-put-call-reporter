@@ -50,7 +50,7 @@ def get_password(service: str, account: str) -> str:
         secret_text = None
         try:
             secret_text = path.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeError):
             read_failed = True
         if read_failed:
             raise KeychainError(f"{RESEND_API_KEY_FILE_ENV} is set but could not be read") from None
