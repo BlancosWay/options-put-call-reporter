@@ -453,7 +453,7 @@ def test_run_send_email_missing_keychain_prints_clear_error_and_keeps_report(
     assert str(report_path) in captured.err
 
 
-def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_path: Path) -> None:
+def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_path: Path, capsys) -> None:
     config_path = tmp_path / "symbols.json"
     _config(config_path)
     stored: dict[str, str] = {}
@@ -478,7 +478,10 @@ def test_setup_email_writes_local_email_config_and_keychain(monkeypatch, tmp_pat
 
     exit_code = main(["setup-email", "--config", str(config_path), "--email-config", str(tmp_path / "email.local.json")])
 
+    captured = capsys.readouterr()
     assert exit_code == 0
+    assert "Resend API key stored in macOS Keychain for reports@example.com." in captured.out
+    assert "Email config written to" in captured.out
     assert input_prompts == ["Resend sender address: ", "Report recipient address: "]
     assert getpass_prompts == ["Resend API key: "]
     assert stored == {
