@@ -14,7 +14,9 @@ options-put-call-report run --no-email
 ## Guidance
 
 - Reports summarize options sentiment and are not financial advice.
-- Do not expose Gmail App Passwords; they are stored in macOS Keychain.
+- Do not expose Resend API keys; Resend API keys belong in macOS Keychain.
+- Never ask users to paste Resend API keys into chat.
+- Email failure logs include Resend stage diagnostics such as `stage=send` and HTTP status when available.
 - Keep local runtime output in ignored paths only.
 - Config lives in `config/symbols.json`; reports and diagnostics live in `archive/YYYY-MM-DD/`; history lives in `data/history.sqlite3`.
 - `docs/ARCHITECTURE.md` explains runtime flow, source metadata, module responsibilities, and safe change points.

@@ -62,7 +62,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "options-put-call-report run --no-email META MSFT NOW",
         "options-put-call-report setup-email",
         "Re-run `options-put-call-report setup-email`",
-        "Email failures include SMTP stage diagnostics like `stage=login`",
+        "Resend API key",
+        "Email failures include Resend stage diagnostics",
         "launchd",
         "Not financial advice",
         "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
@@ -260,7 +261,9 @@ def test_assistant_instruction_pack_targets_all_supported_agents() -> None:
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
         "Re-run `options-put-call-report setup-email`",
-        "stage=login",
+        "Resend API keys belong in macOS Keychain",
+        "Resend API keys should stay in macOS Keychain",
+        "stage=send",
     ]:
         assert text in combined
 
