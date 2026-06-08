@@ -9,7 +9,7 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 - [Features](#features)
 - [Choose your setup](#choose-your-setup)
 - [Install from GitHub](#install-from-github)
-- [Local checkout / development install](#local-checkout--development-install)
+- [Local checkout setup](#local-checkout-setup)
 - [Quickstart](#quickstart)
 - [What this produces](#what-this-produces)
 - [How to read the signal](#how-to-read-the-signal)
@@ -43,8 +43,8 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 | If you want to... | Use this setup | Command style after setup |
 | --- | --- | --- |
 | Install and run the tool like an app | [Install from GitHub](#install-from-github) with `pipx` | `options-put-call-report ...` |
-| Work from this cloned repository | [Local checkout / development install](#local-checkout--development-install) | Activate `.venv`, then run `options-put-call-report ...` |
-| Run from the checkout without activating the venv | Local checkout with `.venv` | `./.venv/bin/options-put-call-report ...` |
+| Work from this cloned repository | [Local checkout setup](#local-checkout-setup) script | `./.venv/bin/options-put-call-report ...` |
+| Activate the local environment once per shell | Local checkout `.venv` | `options-put-call-report ...` |
 | Run on a server, container, or CI | Package install plus env/file secrets | `options-put-call-report ...` with `RESEND_API_KEY` or `RESEND_API_KEY_FILE` |
 
 The docs usually show `options-put-call-report ...` because that is the normal installed command. In a local checkout, either activate the venv first or call the executable by its full path.
@@ -58,41 +58,63 @@ The docs usually show `options-put-call-report ...` because that is the normal i
 
 Use this path when you want the CLI installed globally through `pipx`.
 
-| Step | Command |
-| --- | --- |
-| Install `pipx` | `python3 -m pip install --user pipx` |
-| Add `pipx` apps to PATH | `python3 -m pipx ensurepath` |
-| Install this tool | `python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git` |
-| Install Playwright Chromium | `python3 -m pipx run --spec playwright playwright install chromium` |
+```bash
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
+python3 -m pipx run --spec playwright playwright install chromium
+```
 
 After `ensurepath`, restart your shell or source your shell profile before running `options-put-call-report`.
 
-## Local checkout / development install
+## Local checkout setup
 
 Use this path when you cloned the repository and want to run or modify the code locally.
 
-| Step | macOS/Linux command |
-| --- | --- |
-| Clone | `git clone https://github.com/BlancosWay/options-put-call-reporter.git` |
-| Enter repo | `cd options-put-call-reporter` |
-| Create venv | `python3.11 -m venv .venv` |
-| Activate venv | `source .venv/bin/activate` |
-| Upgrade installer | `python -m pip install --upgrade pip` |
-| Install package and dev tools | `python -m pip install -e ".[dev]"` |
-| Install Playwright Chromium | `python -m playwright install chromium` |
+```bash
+git clone https://github.com/BlancosWay/options-put-call-reporter.git
+cd options-put-call-reporter
+python3.11 scripts/setup_local.py
+```
 
-Windows PowerShell uses the same Python commands, but activates the venv with:
+The setup script creates `.venv`, upgrades pip, installs the package with dev tools, installs Playwright Chromium, and prints the run command.
+
+After setup, run without activating anything:
+
+```bash
+./.venv/bin/options-put-call-report run --no-email
+```
+
+Or activate once per shell and use the shorter command:
+
+```bash
+source .venv/bin/activate
+options-put-call-report run --no-email
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.11 scripts\setup_local.py
+.\.venv\Scripts\options-put-call-report.exe run --no-email
+```
+
+Or activate once per PowerShell session:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+options-put-call-report run --no-email
 ```
 
-After activation, run the same commands shown in the rest of this README. Without activation, prefix commands with the venv executable path:
+Manual fallback for macOS/Linux if you do not want to use the setup script:
 
-| Shell | No-activation command example |
-| --- | --- |
-| macOS/Linux | `./.venv/bin/options-put-call-report run --no-email` |
-| Windows PowerShell | `.\.venv\Scripts\options-put-call-report.exe run --no-email` |
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+python -m playwright install chromium
+```
 
 ## Quickstart
 
@@ -248,9 +270,9 @@ options-put-call-report run --send-email
 
 | Environment | Install | Secret setup | Maintenance |
 | --- | --- | --- | --- |
-| macOS desktop | Use `pipx`, or create a local venv with `python3.11 -m venv .venv && source .venv/bin/activate && python -m pip install -e ".[dev]"`. | Run `options-put-call-report setup-email`; keyring stores in macOS Keychain. | Re-run `options-put-call-report setup-email` when rotating Resend keys; use Keychain Access to delete stale entries. |
-| Windows desktop | Create a Python 3.11+ venv, activate it, then run `python -m pip install -e ".[dev]"`. | Run `options-put-call-report setup-email`; keyring stores in Windows Credential Manager. | Re-run setup when rotating keys; remove stale credentials from Credential Manager. |
-| Linux desktop | Install Python 3.11+, package deps, and a Secret Service/KWallet backend such as GNOME Keyring or KWallet. | Run `options-put-call-report setup-email` in an unlocked desktop session. | If keyring is locked/unavailable, unlock the desktop keyring or use env/file fallback. |
+| macOS desktop | Use `pipx`, or run `python3.11 scripts/setup_local.py` from a checkout. | Run `options-put-call-report setup-email`; keyring stores in macOS Keychain. | Re-run `options-put-call-report setup-email` when rotating Resend keys; use Keychain Access to delete stale entries. |
+| Windows desktop | Use `pipx`, or run `py -3.11 scripts\setup_local.py` from a checkout. | Run `options-put-call-report setup-email`; keyring stores in Windows Credential Manager. | Re-run setup when rotating keys; remove stale credentials from Credential Manager. |
+| Linux desktop | Use `pipx`, or run the local setup script from a checkout; install a Secret Service/KWallet backend such as GNOME Keyring or KWallet for keyring storage. | Run `options-put-call-report setup-email` in an unlocked desktop session. | If keyring is locked/unavailable, unlock the desktop keyring or use env/file fallback. |
 | Linux headless/server | Install Python 3.11+ and the package. | Set `RESEND_API_KEY` or `RESEND_API_KEY_FILE`; also provide `config/email.local.json` or `--email-config`. | Rotate the host secret and restart the scheduler/process. |
 | Docker/Kubernetes | Install package in the image. | Mount the Resend key as a secret file and set `RESEND_API_KEY_FILE`; mount email metadata JSON if needed. | Rotate the orchestrator secret and restart workloads. |
 | GitHub Actions | Install with `python -m pip install -e ".[dev]"`. | Store the key in repository/environment secrets and expose it as `RESEND_API_KEY`. | Rotate GitHub secret; never print it in logs. |

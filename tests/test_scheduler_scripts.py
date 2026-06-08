@@ -32,6 +32,21 @@ def test_launch_agent_installer_writes_expected_schedule_and_logs() -> None:
     assert "launchctl load" in content
 
 
+def test_setup_local_script_bootstraps_checkout_environment() -> None:
+    script = ROOT / "scripts" / "setup_local.py"
+
+    content = script.read_text(encoding="utf-8")
+
+    assert script.stat().st_mode & stat.S_IXUSR
+    assert "Requires Python 3.11 or newer" in content
+    assert "venv.create" in content
+    assert "python -m pip install --upgrade pip" in content
+    assert 'python -m pip install -e ".[dev]"' in content
+    assert "python -m playwright install chromium" in content
+    assert "source .venv/bin/activate" in content
+    assert "options-put-call-report run --no-email" in content
+
+
 def test_readme_documents_scheduler_install_status_and_logs() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 

@@ -57,8 +57,11 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
     for text in [
         "python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git",
         "python3 -m pipx run --spec playwright playwright install chromium",
+        "python3.11 scripts/setup_local.py",
         "python -m playwright install chromium",
         "options-put-call-report run --no-email",
+        "./.venv/bin/options-put-call-report run --no-email",
+        r".\.venv\Scripts\options-put-call-report.exe run --no-email",
         "options-put-call-report run --no-email META MSFT NOW",
         "options-put-call-report setup-email",
         "Re-run `options-put-call-report setup-email`",
