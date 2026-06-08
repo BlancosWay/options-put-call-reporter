@@ -2,6 +2,18 @@
 
 This guide covers install and run paths for `options-put-call-report`.
 
+## Prerequisites
+
+| Requirement | macOS/Linux check | Windows PowerShell check | Notes |
+| --- | --- | --- | --- |
+| Python 3.11+ | `python3.11 --version` | `py -3.11 --version` | Python 3.12 also works. |
+| Git | `git --version` | `git --version` | Needed for GitHub installs and local checkouts. |
+| pip | `python3 -m pip --version` | `py -m pip --version` | Needed to install `pipx` and local development dependencies. |
+
+You also need internet access for GitHub installs, Playwright Chromium downloads, Barchart collection, yfin.dev fallback, and Resend email.
+
+On Linux, Playwright Chromium also needs browser system libraries. The Linux commands below use `python -m playwright install --with-deps chromium` where those libraries may be missing.
+
 ## Choose your setup
 
 | If you want to... | Use this setup | Command style after setup |
@@ -17,14 +29,39 @@ The docs usually show `options-put-call-report ...` because that is the normal i
 
 Use this path when you want the CLI installed globally through `pipx`.
 
+### macOS
+
 ```bash
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
-python3 -m pipx run --spec playwright playwright install chromium
+python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium
+options-put-call-report run --no-email
 ```
 
-After `ensurepath`, restart your shell or source your shell profile before running `options-put-call-report`.
+### Linux
+
+```bash
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
+python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install --with-deps chromium
+options-put-call-report run --no-email
+```
+
+The Linux Chromium install may ask for `sudo` so Playwright can install missing OS packages. If your host already has browser dependencies, `python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium` is enough.
+
+### Windows PowerShell
+
+```powershell
+py -m pip install --user pipx
+py -m pipx ensurepath
+py -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
+py -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium
+options-put-call-report run --no-email
+```
+
+After `ensurepath`, restart your shell or terminal before running `options-put-call-report`. On macOS/Linux, sourcing your shell profile is also enough.
 
 ## Local checkout setup
 
@@ -65,11 +102,31 @@ Or activate once per PowerShell session:
 options-put-call-report run --no-email
 ```
 
-Manual fallback for macOS/Linux if you do not want to use the setup script:
+Manual fallback for macOS if you do not want to use the setup script:
 
 ```bash
 python3.11 -m venv --symlinks .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+python -m playwright install chromium
+```
+
+Manual fallback for Linux:
+
+```bash
+python3.11 -m venv --symlinks .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+python -m playwright install --with-deps chromium
+```
+
+Manual fallback for Windows PowerShell:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 python -m playwright install chromium
@@ -94,14 +151,27 @@ Runs print concise progress by default, including the symbol count, each symbol 
 | Use a custom app config | `options-put-call-report run --config config/symbols.json --no-email` |
 | Use a custom email config | `options-put-call-report run --send-email --email-config path/to/email.local.json` |
 | Use a fixed run date | `options-put-call-report run --no-email --run-date 2026-06-02T21:30:00` |
-| Install Playwright Chromium for pipx install | `python3 -m pipx run --spec playwright playwright install chromium` |
+| Install Playwright Chromium for pipx install on macOS/Windows | `python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium` |
+| Install Playwright Chromium plus Linux system dependencies | `python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install --with-deps chromium` |
 | Install Playwright Chromium in a checkout | `python -m playwright install chromium` |
+| Install Playwright Chromium plus Linux system dependencies in a checkout | `python -m playwright install --with-deps chromium` |
+
+## Scheduling by environment
+
+| Environment | Scheduler | Command to schedule |
+| --- | --- | --- |
+| macOS | Included `launchd` scripts | Run `./scripts/install_launch_agent.sh` from a checkout after `options-put-call-report run --send-email` succeeds manually. |
+| Linux | cron or systemd timer | Schedule `options-put-call-report run --send-email` from an activated venv or global install. |
+| Windows | Windows Task Scheduler | Schedule `options-put-call-report run --send-email` from PowerShell after email setup succeeds. |
+
+For cron, systemd, and Windows Task Scheduler, set the working directory to the repository or app data directory you want to use, and prefer an absolute executable path such as `./.venv/bin/options-put-call-report` or `.\.venv\Scripts\options-put-call-report.exe`.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `options-put-call-report` is not found after install | Shell has not picked up pipx's PATH update, or the local venv is not active | Restart the shell or source your shell profile after `python3 -m pipx ensurepath`; in a checkout, run `source .venv/bin/activate` or use `./.venv/bin/options-put-call-report`. |
-| Browser collection fails immediately | Playwright Chromium is missing | For pipx installs, run `python3 -m pipx run --spec playwright playwright install chromium`. In a checkout, run `python -m playwright install chromium`. |
+| Browser collection fails immediately | Playwright Chromium or Linux browser system dependencies are missing | For pipx installs on macOS/Windows, run `python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium`. On Linux, run `python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install --with-deps chromium`. In a checkout, run `python -m playwright install chromium` or `python -m playwright install --with-deps chromium` on Linux. |
+| Browser error mentions a missing Playwright executable or browser revision | Playwright was upgraded after the browser was installed | Re-run the matching Playwright install command from this guide. For pipx installs, keep the `--spec 'playwright>=1.46,<2'` range so the installer matches this package's supported Playwright range. |
 | Fresh install has no `config/symbols.json` | GitHub install uses packaged defaults | Run without a config file to use packaged defaults, or pass symbols in the terminal or via `--symbols-file`. |
 | Local setup says existing `.venv` is not usable | The venv is incomplete, stale, uses an old Python, or has broken pip | Remove `.venv`, then rerun `python3.11 scripts/setup_local.py`. |

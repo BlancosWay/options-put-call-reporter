@@ -54,9 +54,8 @@ For Linux servers and containers, prefer a mounted secret file. If you need to c
 mkdir -p ~/.config/options-put-call-report
 read -r -s -p "Resend API key: " RESEND_API_KEY
 printf '\n'
-printf '%s\n' "$RESEND_API_KEY" > ~/.config/options-put-call-report/resend-api-key
+( umask 077; printf '%s\n' "$RESEND_API_KEY" > ~/.config/options-put-call-report/resend-api-key )
 unset RESEND_API_KEY
-chmod 600 ~/.config/options-put-call-report/resend-api-key
 export RESEND_API_KEY_FILE=~/.config/options-put-call-report/resend-api-key
 options-put-call-report run --send-email
 ```
@@ -72,11 +71,13 @@ options-put-call-report run --send-email
 | Docker/Kubernetes | Install package in the image. | Mount the Resend key as a secret file and set `RESEND_API_KEY_FILE`; mount email metadata JSON if needed. | Rotate the orchestrator secret and restart workloads. |
 | GitHub Actions | Install with `python -m pip install -e ".[dev]"`. | Store the key in repository/environment secrets and expose it as `RESEND_API_KEY`. | Rotate GitHub secret; never print it in logs. |
 
-Older custom email configs created before Resend support need these email fields in `config/symbols.json` before running setup:
+Older custom app configs created before Resend support need these keys in the existing `config/symbols.json` object before running setup:
 
 ```json
-"keychain_service": "options-put-call-reporter:resend-api-key",
-"resend_api_url": "https://api.resend.com/emails"
+{
+  "keychain_service": "options-put-call-reporter:resend-api-key",
+  "resend_api_url": "https://api.resend.com/emails"
+}
 ```
 
 Keep your existing archive, database, threshold, and symbol settings.

@@ -15,6 +15,8 @@ python -m build
 
 Run `pytest -q` and `python -m build` before publishing or claiming a change is complete.
 
+On fresh Linux hosts, install Playwright browser system dependencies inside the active environment with `python -m playwright install --with-deps chromium`.
+
 ## Secret storage maintenance
 
 - macOS: `setup-email` stores the Resend API key in macOS Keychain. Rotate by rerunning setup, or delete stale entries with Keychain Access.

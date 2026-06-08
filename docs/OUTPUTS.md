@@ -40,6 +40,8 @@ Use the report as options-sentiment research, not as a trade recommendation.
 
 Barchart collection uses Playwright Chromium through `src/reporter/collector.py`. If Barchart collection fails for a symbol, the tool falls back to the free yfin.dev options-chain API. Reports disclose the data source used for each symbol.
 
+yfin.dev is a third-party fallback source. Treat its availability and field coverage as best-effort, and verify important market data independently.
+
 ## Output reference
 
 By default, reports and raw collection artifacts are written under `archive/YYYY-MM-DD/`:
