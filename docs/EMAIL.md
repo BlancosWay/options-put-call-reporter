@@ -2,7 +2,7 @@
 
 `options-put-call-report` can send reports through Resend. The Resend API key is a secret; never commit it or paste it into chat.
 
-Create a free Resend account, verify a sender identity or domain, and create a Resend API key.
+Create a free Resend account, verify a sender identity or domain, and create a Resend API key. Review [Resend Usage Limits](https://resend.com/docs/api-reference/rate-limit) for rate limits, email sending quotas, and 429 responses.
 
 ## What email needs
 
