@@ -39,6 +39,7 @@ def test_setup_local_script_bootstraps_checkout_environment() -> None:
 
     assert script.stat().st_mode & stat.S_IXUSR
     assert "Requires Python 3.11 or newer" in content
+    assert "python -m venv --symlinks .venv" in content
     assert "venv.create" in content
     assert "python -m pip install --upgrade pip" in content
     assert 'python -m pip install -e ".[dev]"' in content

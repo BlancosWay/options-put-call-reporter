@@ -7,11 +7,8 @@ This project is maintained as a Python 3.11+ CLI package with protected `main`, 
 From a development checkout:
 
 ```bash
-python3 -m venv .venv
+python3.11 scripts/setup_local.py
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python -m playwright install chromium
 pytest -q
 python -m build
 ```
@@ -112,7 +109,13 @@ Common skip causes:
 
 ## Documentation upkeep
 
-Update `README.md` when CLI usage, outputs, install steps, data-source behavior, or troubleshooting changes.
+Keep `README.md` as the concise landing page. Update it only when the quick start, common command list, or documentation map changes.
+
+Update `docs/SETUP.md` when install paths, local setup, Windows commands, or setup troubleshooting changes.
+
+Update `docs/EMAIL.md` when Resend setup, keyring behavior, secret lookup, or email troubleshooting changes.
+
+Update `docs/OUTPUTS.md` when report files, signal descriptions, data-source fallback behavior, or diagnostic artifacts change.
 
 Update `docs/ARCHITECTURE.md` when module responsibilities, data flow, persistence, or report outputs change.
 
