@@ -45,7 +45,10 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "CONTRIBUTING.md",
         "SECURITY.md",
         "CODE_OF_CONDUCT.md",
+        "docs/EMAIL.md",
+        "docs/OUTPUTS.md",
         "docs/PUBLISHING.md",
+        "docs/SETUP.md",
         "docs/ARCHITECTURE.md",
         "docs/MAINTENANCE.md",
     ]
@@ -54,51 +57,82 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         assert (ROOT / path).exists(), path
 
     readme = _read("README.md")
+    # README is intentionally a landing page; detailed references belong in docs/.
+    assert len(readme.splitlines()) <= 180
     for text in [
         "python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git",
         "python3 -m pipx run --spec playwright playwright install chromium",
         "python3.11 scripts/setup_local.py",
-        "python -m playwright install chromium",
+        "Email delivery reads the Resend API key from `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring.",
         "options-put-call-report run --no-email",
         "./.venv/bin/options-put-call-report run --no-email",
-        r".\.venv\Scripts\options-put-call-report.exe run --no-email",
         "options-put-call-report run --no-email META MSFT NOW",
         "options-put-call-report setup-email",
-        "Re-run `options-put-call-report setup-email`",
         "Resend API key",
+        "launchd",
+        "Not financial advice",
+        "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
+        "Falls back to yfin.dev options-chain data when Barchart collection fails.",
+        "Reports disclose the data source used for each symbol.",
+        "docs/SETUP.md",
+        "docs/EMAIL.md",
+        "docs/OUTPUTS.md",
+        "docs/ARCHITECTURE.md",
+        "docs/MAINTENANCE.md",
+    ]:
+        assert text in readme
+
+    setup = _read("docs/SETUP.md")
+    for text in [
+        "After `ensurepath`, restart your shell",
+        "python3.11 -m venv --symlinks .venv",
+        r".\.venv\Scripts\options-put-call-report.exe run --no-email",
+        "python -m playwright install chromium",
+        "options-put-call-report run --config config/symbols.json --no-email",
+        "options-put-call-report run --send-email --email-config path/to/email.local.json",
+        "options-put-call-report run --no-email --run-date 2026-06-02T21:30:00",
+    ]:
+        assert text in setup
+
+    email = _read("docs/EMAIL.md")
+    for text in [
+        "Create a free Resend account, verify a sender identity or domain, and create a Resend API key.",
+        "read -r -s -p \"Resend API key: \" RESEND_API_KEY",
+        "Re-run `options-put-call-report setup-email`",
         "Older custom email configs",
         '"keychain_service": "options-put-call-reporter:resend-api-key"',
         '"resend_api_url": "https://api.resend.com/emails"',
         "Email failures include Resend stage diagnostics",
-        "launchd",
-        "Not financial advice",
-        "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
-        "After `ensurepath`, restart your shell",
-        "Falls back to yfin.dev options-chain data when Barchart collection fails.",
-        "Reports disclose the data source used for each symbol.",
-        "`{SYMBOL}-yfin-raw.json` | Fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
-        "## Table of contents",
-        "## What this produces",
-        "## How to read the signal",
-        "## Data sources and fallback behavior",
-        "## CLI command reference",
-        "Symptom",
-        "Likely cause",
-        "Fix",
-        "`{SYMBOL}-failure.html`",
-        "`{SYMBOL}-failure.png`",
-        "docs/ARCHITECTURE.md",
-        "docs/MAINTENANCE.md",
         "mkdir -p ~/.config/options-put-call-report",
         "Every `run --send-email` invocation also needs sender/recipient metadata",
         "`--email-config`",
         "`from_email` and `to_email`",
     ]:
-        assert text in readme
+        assert text in email
+    assert 'export RESEND_API_KEY="re_..."' not in email
+
+    outputs = _read("docs/OUTPUTS.md")
+    for text in [
+        "`{SYMBOL}-yfin-raw.json` | Fallback yfin.dev raw responses, written only when yfin.dev fallback is used.",
+        "`{SYMBOL}-failure.html`",
+        "`{SYMBOL}-failure.png`",
+        "## How to read the signal",
+        "## Data sources and fallback behavior",
+    ]:
+        assert text in outputs
 
     security = _read("SECURITY.md")
     assert "data/history.sqlite3" not in security
     assert "`data`" in security
+
+    contributing = _read("CONTRIBUTING.md")
+    for text in [
+        "python3.11 scripts/setup_local.py",
+        "Update `docs/SETUP.md` when install, setup, or troubleshooting commands change.",
+        "Update `docs/EMAIL.md` when email setup, keyring, or secret handling changes.",
+        "Update `docs/OUTPUTS.md` when outputs, data sources, fallback behavior, or report diagnostics change.",
+    ]:
+        assert text in contributing
 
 
 def test_architecture_doc_covers_runtime_flow_and_change_points() -> None:
@@ -147,6 +181,9 @@ def test_maintenance_doc_covers_ci_dependabot_and_release_workflow() -> None:
         "archive/",
         "data/",
         "config/email.local.json",
+        "docs/SETUP.md",
+        "docs/EMAIL.md",
+        "docs/OUTPUTS.md",
     ]:
         assert text in maintenance
 

@@ -3,11 +3,8 @@
 ## Development setup
 
 ```bash
-python3 -m venv .venv
+python3.11 scripts/setup_local.py
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python -m playwright install chromium
 pytest -q
 ```
 
@@ -23,7 +20,10 @@ pytest -q
 - Run `pytest -q`.
 - Run `python -m build`.
 - Add or update tests for behavior changes.
-- Update `README.md` when commands, outputs, data sources, or troubleshooting change.
+- Update `README.md` only when the concise landing page needs to change.
+- Update `docs/SETUP.md` when install, setup, or troubleshooting commands change.
+- Update `docs/EMAIL.md` when email setup, keyring, or secret handling changes.
+- Update `docs/OUTPUTS.md` when outputs, data sources, fallback behavior, or report diagnostics change.
 - Update `docs/ARCHITECTURE.md` when runtime flow, persistence, or report generation changes.
 - Update `docs/MAINTENANCE.md` when CI, branch protection, Dependabot, or release workflow changes.
 - Keep generated archives, SQLite history, build artifacts, and local email config out of commits.

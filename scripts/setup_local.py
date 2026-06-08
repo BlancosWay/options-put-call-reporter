@@ -106,9 +106,9 @@ def main() -> int:
 
     print(f"Setting up local checkout at {ROOT}", flush=True)
     if not VENV_DIR.exists():
-        print("$ python -m venv .venv", flush=True)
+        print("$ python -m venv --symlinks .venv", flush=True)
         try:
-            venv.create(VENV_DIR, with_pip=True)
+            venv.create(VENV_DIR, with_pip=True, symlinks=True)
         except (OSError, subprocess.CalledProcessError) as error:
             print(f"Setup failed while creating .venv: {_error_detail(error)}", file=sys.stderr)
             print("Fix the error above, then rerun this script.", file=sys.stderr)

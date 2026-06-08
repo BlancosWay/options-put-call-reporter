@@ -166,8 +166,8 @@ def test_setup_local_runs_success_steps_in_order(tmp_path: Path, monkeypatch, ca
     monkeypatch.setattr(setup_local, "ROOT", tmp_path)
     monkeypatch.setattr(setup_local, "VENV_DIR", tmp_path / ".venv")
 
-    def create_venv(path: Path, *, with_pip: bool) -> None:
-        calls.append(f"create:{path.name}:{with_pip}")
+    def create_venv(path: Path, *, with_pip: bool, symlinks: bool) -> None:
+        calls.append(f"create:{path.name}:{with_pip}:{symlinks}")
 
     def run_step(command: list[str], display: str) -> None:
         calls.append(display)
@@ -177,7 +177,7 @@ def test_setup_local_runs_success_steps_in_order(tmp_path: Path, monkeypatch, ca
 
     assert setup_local.main() == 0
     assert calls == [
-        "create:.venv:True",
+        "create:.venv:True:True",
         "python -m pip install --upgrade pip",
         'python -m pip install -e ".[dev]"',
         "python -m playwright install chromium",
