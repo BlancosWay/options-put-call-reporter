@@ -54,17 +54,12 @@ LITE  # comments are ignored
 
 ## What it does
 
-| Area | Summary |
-| --- | --- |
-| Collection | Collects Barchart put/call ratio data with Playwright Chromium. |
-| Fallback data | Falls back to yfin.dev options-chain data when Barchart collection fails. |
-| Reports | Produces HTML, Markdown, CSV, JSON, and raw diagnostic outputs. |
-| Transparency | Reports disclose the data source used for each symbol. |
-| History | Tracks snapshots in SQLite and reports day/week/month drift when prior data exists. |
-| Symbols | Supports packaged defaults, terminal symbols, and plain-text symbol files. |
-| Email | Sends Resend email reports using a Resend API key from the environment, a secret file, or the system keyring. |
-| Scheduling | Includes launchd scripts for local daily runs on macOS. |
-| Assistant docs | Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini. |
+1. Start with a watchlist. Use the packaged defaults, type symbols in the terminal, or pass a plain-text symbol file.
+2. Collect each symbol's options sentiment. Barchart is the primary source. Falls back to yfin.dev options-chain data when Barchart collection fails.
+3. Turn the data into a report you can compare over time. Each run writes HTML/Markdown reports, per-symbol snapshots, raw diagnostics, and SQLite history for drift.
+4. Optionally send or schedule the report when you want it automated. Resend handles email delivery, and the macOS launchd scripts can run the report daily.
+
+Reports disclose the data source used for each symbol. Fallback data is visible instead of hidden.
 
 ## Outputs and signal meaning
 
@@ -111,7 +106,7 @@ Scheduler logs are written to `archive/runner.log`, `archive/launchd.out.log`, a
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and sensitive local files. |
 | [assistant-pack/README.md](assistant-pack/README.md) | Portable assistant instructions. |
 
-This repository includes assistant instructions for maintaining and operating the tool:
+This repository ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini for maintaining and operating the tool:
 
 - `AGENTS.md` for Codex-style agents.
 - `CLAUDE.md` for Claude Code.

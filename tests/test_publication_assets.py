@@ -71,7 +71,11 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Resend API key",
         "launchd",
         "Not financial advice",
-        "Ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini.",
+        "assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini",
+        "Start with a watchlist.",
+        "Collect each symbol's options sentiment.",
+        "Turn the data into a report you can compare over time.",
+        "Optionally send or schedule the report when you want it automated.",
         "Falls back to yfin.dev options-chain data when Barchart collection fails.",
         "Reports disclose the data source used for each symbol.",
         "docs/SETUP.md",
@@ -81,6 +85,7 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "docs/MAINTENANCE.md",
     ]:
         assert text in readme
+    assert "| Area | Summary |" not in readme
 
     setup = _read("docs/SETUP.md")
     for text in [
@@ -192,7 +197,7 @@ def test_public_docs_describe_existing_assistant_assets() -> None:
     readme = _read("README.md")
 
     for text in [
-        "This repository includes assistant instructions for maintaining and operating the tool:",
+        "This repository ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini for maintaining and operating the tool:",
         "`AGENTS.md` for Codex-style agents.",
         "`CLAUDE.md` for Claude Code.",
         "`GEMINI.md` for Gemini CLI.",
