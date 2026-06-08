@@ -14,7 +14,7 @@ Use this path when you want the CLI installed globally:
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git
-python3 -m pipx run --spec playwright playwright install chromium
+python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium
 options-put-call-report run --no-email
 ```
 
@@ -31,7 +31,7 @@ python3.11 scripts/setup_local.py
 
 If you prefer activating the environment, run `source .venv/bin/activate`, then use the shorter `options-put-call-report ...` commands.
 
-See [docs/SETUP.md](docs/SETUP.md) for Windows commands, manual setup, and troubleshooting.
+For Windows commands and Linux browser dependencies, see [docs/SETUP.md](docs/SETUP.md).
 
 ## Common commands
 
@@ -76,6 +76,8 @@ Email delivery uses Resend. Email delivery reads the Resend API key from `RESEND
 See [docs/EMAIL.md](docs/EMAIL.md) for desktop setup, CI/server secrets, keyring behavior, and safe troubleshooting.
 
 ## Scheduler
+
+The included scheduler script is for macOS `launchd`. On Linux or Windows, schedule `options-put-call-report run --send-email` with cron, systemd timers, or Windows Task Scheduler.
 
 Before installing the scheduler, confirm a manual email run succeeds:
 

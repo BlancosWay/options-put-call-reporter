@@ -61,8 +61,9 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
     assert len(readme.splitlines()) <= 180
     for text in [
         "python3 -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git",
-        "python3 -m pipx run --spec playwright playwright install chromium",
+        "python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium",
         "python3.11 scripts/setup_local.py",
+        "For Windows commands and Linux browser dependencies, see [docs/SETUP.md](docs/SETUP.md).",
         "Email delivery reads the Resend API key from `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring.",
         "options-put-call-report run --no-email",
         "./.venv/bin/options-put-call-report run --no-email",
@@ -89,13 +90,26 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
 
     setup = _read("docs/SETUP.md")
     for text in [
+        "## Prerequisites",
+        "`python3.11 --version`",
+        "`py -3.11 --version`",
+        "### macOS",
+        "### Linux",
+        "python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install --with-deps chromium",
+        "### Windows PowerShell",
+        "py -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git",
+        "py -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium",
         "After `ensurepath`, restart your shell",
         "python3.11 -m venv --symlinks .venv",
         r".\.venv\Scripts\options-put-call-report.exe run --no-email",
         "python -m playwright install chromium",
+        "python -m playwright install --with-deps chromium",
         "options-put-call-report run --config config/symbols.json --no-email",
         "options-put-call-report run --send-email --email-config path/to/email.local.json",
         "options-put-call-report run --no-email --run-date 2026-06-02T21:30:00",
+        "| Windows | Windows Task Scheduler | Schedule `options-put-call-report run --send-email`",
+        "set the working directory",
+        "prefer an absolute executable path",
     ]:
         assert text in setup
 
@@ -104,7 +118,7 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Create a free Resend account, verify a sender identity or domain, and create a Resend API key.",
         "read -r -s -p \"Resend API key: \" RESEND_API_KEY",
         "Re-run `options-put-call-report setup-email`",
-        "Older custom email configs",
+        "Older custom app configs",
         '"keychain_service": "options-put-call-reporter:resend-api-key"',
         '"resend_api_url": "https://api.resend.com/emails"',
         "Email failures include Resend stage diagnostics",
@@ -112,6 +126,8 @@ def test_public_repository_docs_exist_and_cover_required_topics() -> None:
         "Every `run --send-email` invocation also needs sender/recipient metadata",
         "`--email-config`",
         "`from_email` and `to_email`",
+        "( umask 077; printf '%s\\n' \"$RESEND_API_KEY\" > ~/.config/options-put-call-report/resend-api-key )",
+        "{\n  \"keychain_service\": \"options-put-call-reporter:resend-api-key\",",
     ]:
         assert text in email
     assert 'export RESEND_API_KEY="re_..."' not in email
