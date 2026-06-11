@@ -216,12 +216,12 @@ def test_public_docs_describe_existing_assistant_assets() -> None:
 
     for text in [
         "This repository ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini for maintaining and operating the tool:",
-        "`AGENTS.md` for Codex-style agents.",
-        "`CLAUDE.md` for Claude Code.",
-        "`GEMINI.md` for Gemini CLI.",
-        "`.github/copilot-instructions.md` for GitHub Copilot.",
-        "`assistant-pack/` for portable skill/prompt files.",
-        "See `assistant-pack/README.md` for copy/install guidance.",
+        "[`AGENTS.md`](AGENTS.md) for Codex-style agents.",
+        "[`CLAUDE.md`](CLAUDE.md) for Claude Code.",
+        "[`GEMINI.md`](GEMINI.md) for Gemini CLI.",
+        "[`.github/copilot-instructions.md`](.github/copilot-instructions.md) for GitHub Copilot.",
+        "[`assistant-pack/`](assistant-pack/) for portable skill/prompt files.",
+        "See [`assistant-pack/README.md`](assistant-pack/README.md) for copy/install guidance.",
     ]:
         assert text in readme
 
