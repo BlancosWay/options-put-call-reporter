@@ -40,6 +40,7 @@ For Windows commands and Linux browser dependencies, see [docs/SETUP.md](docs/SE
 | Run default watchlist without email | `options-put-call-report run --no-email` |
 | Run selected symbols | `options-put-call-report run --no-email META MSFT NOW` |
 | Run symbols from a file | `options-put-call-report run --no-email --symbols-file watchlist.txt` |
+| Run and open the report in your browser | `options-put-call-report run --no-email --open` |
 | Configure Resend email | `options-put-call-report setup-email` |
 | Run and send email | `options-put-call-report run --send-email` |
 

@@ -56,6 +56,7 @@ The macOS launchd scheduler scripts live under `scripts/`. Scheduled runs write 
 ## Safe change points
 
 - Change CLI behavior in `src/reporter/cli.py` and update README command examples.
+- The `run --open` flag opens the rendered `report.html` in the default browser via the stdlib `webbrowser` module; it is best-effort and never changes the exit code, and scheduled/headless runs do not pass it.
 - Change Barchart or yfin.dev parsing only in `src/reporter/collector.py`.
 - Change sentiment thresholds in `src/reporter/analyzer.py` and update tests that describe signal meaning.
 - Change saved history shape in `src/reporter/history.py` with additive migrations.
