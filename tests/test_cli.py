@@ -87,6 +87,27 @@ def test_run_no_email_creates_report_and_saves_history(monkeypatch, tmp_path: Pa
     assert HistoryStore(tmp_path / "history.sqlite3").latest_snapshot("NOW") is not None
 
 
+def test_run_open_flag_opens_report_in_browser(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    opened: list[str] = []
+    monkeypatch.setattr("reporter.cli.webbrowser.open", lambda url: opened.append(url) or True)
+
+    exit_code = main(
+        ["run", "--config", str(config_path), "--no-email", "--open", "--run-date", "2026-06-02T21:30:00"]
+    )
+
+    assert exit_code == 0
+    report_path = tmp_path / "archive" / "2026-06-02" / "report.html"
+    assert opened == [report_path.as_uri()]
+
+
 def test_run_positional_symbols_override_config_symbols(monkeypatch, tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     _config(config_path, symbols=["NOW"])

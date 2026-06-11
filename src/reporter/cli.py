@@ -6,6 +6,7 @@ import getpass
 import json
 import re
 import sys
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -40,6 +41,12 @@ def _write_email_config(path: Path, email_config: EmailConfig) -> None:
 
 def _progress(message: str) -> None:
     print(message, flush=True)
+
+
+def _open_in_browser(html_path: Path) -> None:
+    if webbrowser.open(html_path.as_uri()):
+        return
+    print(f"Could not open report in browser. Report remains at {html_path}", file=sys.stderr)
 
 
 def _short_symbol_error(exc: Exception, symbol_config: SymbolConfig) -> str:
@@ -126,6 +133,9 @@ async def _run_async(args: argparse.Namespace) -> int:
             exit_code = 1
 
     _progress(f"Report written to {bundle.html_path}")
+    if args.open:
+        _progress("Opening report in browser...")
+        _open_in_browser(bundle.html_path)
     return exit_code
 
 
@@ -165,6 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
     email_group = run.add_mutually_exclusive_group()
     email_group.add_argument("--send-email", action="store_true")
     email_group.add_argument("--no-email", action="store_true")
+    run.add_argument("--open", action="store_true")
     run.add_argument("symbols", nargs="*")
 
     setup = subparsers.add_parser("setup-email")
