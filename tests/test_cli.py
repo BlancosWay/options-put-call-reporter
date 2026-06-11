@@ -108,6 +108,49 @@ def test_run_open_flag_opens_report_in_browser(monkeypatch, tmp_path: Path) -> N
     assert opened == [report_path.as_uri()]
 
 
+def test_run_open_flag_browser_failure_is_non_fatal(monkeypatch, tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    def boom(url):
+        raise RuntimeError("no browser available")
+
+    monkeypatch.setattr("reporter.cli.webbrowser.open", boom)
+
+    exit_code = main(
+        ["run", "--config", str(config_path), "--no-email", "--open", "--run-date", "2026-06-02T21:30:00"]
+    )
+
+    assert exit_code == 0
+    report_path = tmp_path / "archive" / "2026-06-02" / "report.html"
+    assert report_path.exists()
+    captured = capsys.readouterr()
+    assert "Could not open report in browser" in captured.err
+
+
+def test_run_without_open_flag_does_not_open_browser(monkeypatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "symbols.json"
+    _config(config_path)
+
+    async def fake_collect(symbol_config, captured_at, archive_dir):
+        return _sample_snapshot(symbol_config, captured_at, archive_dir)
+
+    monkeypatch.setattr("reporter.cli.collect_symbol", fake_collect)
+
+    opened: list[str] = []
+    monkeypatch.setattr("reporter.cli.webbrowser.open", lambda url: opened.append(url) or True)
+
+    exit_code = main(["run", "--config", str(config_path), "--no-email", "--run-date", "2026-06-02T21:30:00"])
+
+    assert exit_code == 0
+    assert opened == []
+
+
 def test_run_positional_symbols_override_config_symbols(monkeypatch, tmp_path: Path) -> None:
     config_path = tmp_path / "symbols.json"
     _config(config_path, symbols=["NOW"])
