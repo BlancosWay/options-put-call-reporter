@@ -1,8 +1,22 @@
 # Options Put/Call Reporter
 
+[![CI](https://github.com/BlancosWay/options-put-call-reporter/actions/workflows/ci.yml/badge.svg)](https://github.com/BlancosWay/options-put-call-reporter/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool collects options-expiration data, classifies monthly put/call signals, tracks history, renders reports, and can optionally email the report through Resend.
 
+> [!IMPORTANT]
 > Not financial advice. This project summarizes options sentiment data for research and automation. Verify all market data independently before making trading or investment decisions.
+
+## Features
+
+- **Watchlist driven** — use the packaged defaults, pass symbols on the command line, or point at a plain-text symbol file.
+- **Barchart collection with fallback** — Playwright Chromium scrapes Barchart, with an automatic yfin.dev options-chain fallback when collection fails. Every report discloses which source produced each symbol.
+- **Monthly sentiment signals** — expiration rows are classified bullish, bearish, or neutral from configurable put/call ratio thresholds.
+- **History and drift** — each run is stored in SQLite so reports can show how a symbol moved versus prior runs.
+- **Multiple formats** — HTML and Markdown reports plus per-symbol CSV/JSON snapshots and raw diagnostics.
+- **Optional email and scheduling** — deliver through Resend and automate with the bundled macOS `launchd` job.
 
 ## Quick start
 
@@ -32,6 +46,9 @@ python3.11 scripts/setup_local.py
 If you prefer activating the environment, run `source .venv/bin/activate`, then use the shorter `options-put-call-report ...` commands.
 
 For Windows commands and Linux browser dependencies, see [docs/SETUP.md](docs/SETUP.md).
+
+> [!NOTE]
+> Collection drives a headless Chromium through Playwright. If a run reports a browser error, (re)install it with `python -m playwright install chromium`.
 
 ## Common commands
 
@@ -74,6 +91,9 @@ See [docs/OUTPUTS.md](docs/OUTPUTS.md) for output files, fallback artifacts, and
 
 Email delivery uses Resend. Email delivery reads the Resend API key from `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring. On desktop machines, `options-put-call-report setup-email` stores the key in the system keyring and writes sender/recipient metadata to ignored local config.
 
+> [!WARNING]
+> Never commit a Resend API key or paste one into a chat. Keep it in `RESEND_API_KEY`, `RESEND_API_KEY_FILE`, or the system keyring.
+
 See [docs/EMAIL.md](docs/EMAIL.md) for desktop setup, CI/server secrets, keyring behavior, and safe troubleshooting.
 
 ## Scheduler
@@ -105,9 +125,6 @@ Scheduler logs are written to `archive/runner.log`, `archive/launchd.out.log`, a
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Runtime flow, source metadata, module responsibilities, and safe change points. |
 | [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | Local validation, protected `main`, CI, Dependabot auto-merge, and release checks. |
 | [docs/PUBLISHING.md](docs/PUBLISHING.md) | Initial GitHub publication. |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributor expectations. |
-| [SECURITY.md](SECURITY.md) | Vulnerability reporting and sensitive local files. |
-| [assistant-pack/README.md](assistant-pack/README.md) | Portable assistant instructions. |
 
 This repository ships assistant instructions for Claude Code, GitHub Copilot, Codex, and Gemini for maintaining and operating the tool:
 
@@ -129,7 +146,3 @@ python -m build
 ```
 
 CI runs the test suite on Python 3.11 and 3.12 and builds the package.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
