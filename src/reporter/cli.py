@@ -45,7 +45,7 @@ def _progress(message: str) -> None:
 
 def _open_in_browser(html_path: Path) -> None:
     try:
-        opened = webbrowser.open(html_path.as_uri())
+        opened = webbrowser.open(html_path.resolve().as_uri())
     except Exception as exc:
         print(f"Could not open report in browser: {exc}. Report remains at {html_path}", file=sys.stderr)
         return
