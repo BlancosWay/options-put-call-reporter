@@ -9,6 +9,12 @@ Daily Barchart put/call ratio sentiment reporter for a stock watchlist. The tool
 > [!IMPORTANT]
 > Not financial advice. This project summarizes options sentiment data for research and automation. Verify all market data independently before making trading or investment decisions.
 
+## Requirements
+
+- **Python 3.11 or newer.** Check with `python3 --version` (macOS/Linux) or `py --version` (Windows). If your default `python3` is older, run the `pipx` commands below with an explicit 3.11+ interpreter such as `python3.11`.
+- **Internet access** for the GitHub install, Playwright Chromium download, Barchart collection, yfin.dev fallback, and Resend email.
+- **A headless Chromium**, installed through Playwright in the steps below.
+
 ## Features
 
 - **Watchlist driven** — use the packaged defaults, pass symbols on the command line, or point at a plain-text symbol file.
@@ -32,6 +38,9 @@ python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install chromium
 options-put-call-report run --no-email
 ```
 
+> [!IMPORTANT]
+> `pipx ensurepath` updates your `PATH` only for new shells. Open a new terminal (or `source` your shell profile) before the final command, or call the CLI directly as `~/.local/bin/options-put-call-report run --no-email`.
+
 ### Run from a local checkout
 
 Use this path when you cloned the repository and want to run or modify the code:
@@ -46,6 +55,9 @@ python3.11 scripts/setup_local.py
 If you prefer activating the environment, run `source .venv/bin/activate`, then use the shorter `options-put-call-report ...` commands.
 
 For Windows commands and Linux browser dependencies, see [docs/SETUP.md](docs/SETUP.md).
+
+> [!NOTE]
+> The commands above target macOS and Linux. On **Windows**, use the `py` launcher in **PowerShell** (for example `py -m pipx install git+https://github.com/BlancosWay/options-put-call-reporter.git`); the single-quoted `--spec` argument does not work in `cmd.exe`. On **Linux**, install browser system libraries with `python3 -m pipx run --spec 'playwright>=1.46,<2' playwright install --with-deps chromium`.
 
 > [!NOTE]
 > Collection drives a headless Chromium through Playwright. If a run reports a browser error, (re)install it with `python -m playwright install chromium`.
