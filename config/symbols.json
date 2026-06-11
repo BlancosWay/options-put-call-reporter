@@ -25,6 +25,12 @@
     {"symbol": "NFLX", "url": "https://www.barchart.com/stocks/quotes/nflx/put-call-ratios"},
     {"symbol": "NOW", "url": "https://www.barchart.com/stocks/quotes/now/put-call-ratios"},
     {"symbol": "AAOI", "url": "https://www.barchart.com/stocks/quotes/aaoi/put-call-ratios"},
-    {"symbol": "LITE", "url": "https://www.barchart.com/stocks/quotes/lite/put-call-ratios"}
+    {"symbol": "LITE", "url": "https://www.barchart.com/stocks/quotes/lite/put-call-ratios"},
+    {"symbol": "AVGO", "url": "https://www.barchart.com/stocks/quotes/avgo/put-call-ratios"},
+    {"symbol": "COHR", "url": "https://www.barchart.com/stocks/quotes/cohr/put-call-ratios"},
+    {"symbol": "BE", "url": "https://www.barchart.com/stocks/quotes/be/put-call-ratios"},
+    {"symbol": "TE", "url": "https://www.barchart.com/stocks/quotes/te/put-call-ratios"},
+    {"symbol": "QQQM", "url": "https://www.barchart.com/stocks/quotes/qqqm/put-call-ratios"},
+    {"symbol": "SPY", "url": "https://www.barchart.com/stocks/quotes/spy/put-call-ratios"}
   ]
 }
