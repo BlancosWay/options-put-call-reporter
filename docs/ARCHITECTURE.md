@@ -18,6 +18,8 @@
 
 Barchart primary collection uses Playwright Chromium through `src/reporter/collector.py`. Successful extraction archives raw captures as `{SYMBOL}-raw.html` and `{SYMBOL}-raw.json`.
 
+Collection waits for the Implied Volatility, Historic Volatility, IV Rank, and IV Percentile top metrics to render, and treats `Latest Earnings` as optional. ETFs (for example SPY and QQQM) have no earnings date, so this keeps them on Barchart instead of forcing a yfin.dev fallback.
+
 If Barchart extraction fails, the collector writes failure diagnostics as `{SYMBOL}-failure.html` and `{SYMBOL}-failure.png` before either falling back to yfin.dev or reporting the symbol failure.
 
 ### yfin.dev fallback

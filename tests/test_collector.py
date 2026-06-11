@@ -386,6 +386,28 @@ async def test_collect_from_html_extracts_metrics_with_nonbreaking_space_labels(
 
 
 @pytest.mark.asyncio
+async def test_collect_from_html_allows_missing_latest_earnings(tmp_path: Path) -> None:
+    html = FIXTURE_HTML.read_text(encoding="utf-8").replace(
+        "      <span>Latest Earnings:</span><strong>07/29/26</strong>\n",
+        "",
+    )
+
+    snapshot = await collect_from_html(
+        symbol="SPY",
+        url="https://www.barchart.com/stocks/quotes/spy/put-call-ratios",
+        html=html,
+        captured_at=datetime(2026, 6, 2, 21, 30),
+    )
+
+    assert snapshot.metrics.latest_earnings is None
+    assert snapshot.metrics.implied_volatility == 31.62
+    assert snapshot.metrics.historic_volatility == 33.28
+    assert snapshot.metrics.iv_rank == 61.17
+    assert snapshot.metrics.iv_percentile == 85.0
+    assert len(snapshot.rows) == 3
+
+
+@pytest.mark.asyncio
 async def test_collect_from_html_rejects_snapshots_missing_required_top_metrics(tmp_path: Path) -> None:
     html = FIXTURE_HTML.read_text(encoding="utf-8").replace(
         "      <span>IV Rank:</span><strong>61.17%</strong>\n",
