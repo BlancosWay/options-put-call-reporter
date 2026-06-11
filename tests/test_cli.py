@@ -2,7 +2,7 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 
-from reporter.cli import main
+from reporter.cli import _open_in_browser, main
 from reporter.history import HistoryStore
 from reporter.keychain import KeychainError
 from reporter.models import EmailConfig, ExpirationRow, Snapshot, SymbolConfig, TopMetrics
@@ -105,7 +105,17 @@ def test_run_open_flag_opens_report_in_browser(monkeypatch, tmp_path: Path) -> N
 
     assert exit_code == 0
     report_path = tmp_path / "archive" / "2026-06-02" / "report.html"
-    assert opened == [report_path.as_uri()]
+    assert opened == [report_path.resolve().as_uri()]
+
+
+def test_open_in_browser_resolves_relative_path(monkeypatch) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr("reporter.cli.webbrowser.open", lambda url: opened.append(url) or True)
+
+    relative_path = Path("archive/2026-06-02/report.html")
+    _open_in_browser(relative_path)
+
+    assert opened == [relative_path.resolve().as_uri()]
 
 
 def test_run_open_flag_browser_failure_is_non_fatal(monkeypatch, tmp_path: Path, capsys) -> None:
