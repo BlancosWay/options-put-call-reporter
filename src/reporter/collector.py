@@ -27,8 +27,7 @@ TOP_METRICS_READY_SCRIPT = r"""() => {
         return false;
     }
     const text = toolbar.innerText.replace(/\u00a0/g, " ").replace(/\s+/g, " ");
-    return /Latest Earnings:\s+\S+/.test(text)
-        && /Implied Volatility:\s+[-0-9.]+%/.test(text)
+    return /Implied Volatility:\s+[-0-9.]+%/.test(text)
         && /Historic Volatility:\s+[-0-9.]+%/.test(text)
         && /IV Rank:\s+[-0-9.]+%/.test(text)
         && /IV Percentile:\s+[-0-9.]+%/.test(text);
@@ -370,8 +369,6 @@ async def _extract_metrics(page, symbol: str) -> TopMetrics:
 
 def _missing_top_metric_labels(metrics: TopMetrics) -> list[str]:
     missing: list[str] = []
-    if metrics.latest_earnings is None:
-        missing.append("Latest Earnings")
     if metrics.implied_volatility is None:
         missing.append("Implied Volatility")
     if metrics.historic_volatility is None:
