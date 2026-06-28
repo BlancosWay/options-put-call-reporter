@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import math
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -57,8 +58,22 @@ def _format_value(value: object | None) -> str:
     if isinstance(value, int):
         return _format_number(value)
     if isinstance(value, float):
+        if not math.isfinite(value):
+            return "—"
         return f"{value:.2f}"
     return str(value)
+
+
+def _format_ratio(value: float) -> str:
+    if not math.isfinite(value):
+        return "—"
+    return f"{value:.2f}"
+
+
+def _csv_ratio(value: float) -> object:
+    if not math.isfinite(value):
+        return ""
+    return value
 
 
 def _html_value(value: object | None) -> str:
@@ -162,7 +177,7 @@ def _monthly_html(report: SymbolReport) -> str:
         rows.append(
             "<tr>"
             f"<td>{escape(item.month)}</td><td>{escape(item.expiration_label)}</td>"
-            f"<td>{item.put_call_volume_ratio:.2f}</td><td>{item.put_call_open_interest_ratio:.2f}</td>"
+            f"<td>{_format_ratio(item.put_call_volume_ratio)}</td><td>{_format_ratio(item.put_call_open_interest_ratio)}</td>"
             f"<td>{_format_number(item.total_volume)}</td><td>{_format_number(item.total_open_interest)}</td>"
             f"<td>{_signal_badge(item.signal.value, item.signal)}</td>"
             "</tr>"
@@ -219,7 +234,7 @@ def _monthly_markdown(report: SymbolReport) -> list[str]:
         rows.append(
             "| "
             f"{item.month} | {item.expiration_label} | "
-            f"{item.put_call_volume_ratio:.2f} | {item.put_call_open_interest_ratio:.2f} | "
+            f"{_format_ratio(item.put_call_volume_ratio)} | {_format_ratio(item.put_call_open_interest_ratio)} | "
             f"{_format_number(item.total_volume)} | {_format_number(item.total_open_interest)} | {item.signal.value} |"
         )
     return rows
@@ -249,9 +264,9 @@ def _raw_rows_html(report: SymbolReport) -> str:
         rows.append(
             "<tr>"
             f"<td>{escape(row.expiration_label)}</td><td>{row.dte}</td><td>{_format_number(row.put_volume)}</td>"
-            f"<td>{_format_number(row.call_volume)}</td><td>{_format_number(row.total_volume)}</td><td>{row.put_call_volume_ratio:.2f}</td>"
+            f"<td>{_format_number(row.call_volume)}</td><td>{_format_number(row.total_volume)}</td><td>{_format_ratio(row.put_call_volume_ratio)}</td>"
             f"<td>{_format_number(row.put_open_interest)}</td><td>{_format_number(row.call_open_interest)}</td><td>{_format_number(row.total_open_interest)}</td>"
-            f"<td>{row.put_call_open_interest_ratio:.2f}</td><td>{_html_value(row.implied_volatility)}</td>"
+            f"<td>{_format_ratio(row.put_call_open_interest_ratio)}</td><td>{_html_value(row.implied_volatility)}</td>"
             f"<td>{_html_value(row.is_monthly)}</td>"
             "</tr>"
         )
@@ -270,8 +285,8 @@ def _raw_rows_markdown(report: SymbolReport) -> list[str]:
         rows.append(
             "| "
             f"{row.expiration_label} | {row.dte} | {_format_number(row.put_volume)} | {_format_number(row.call_volume)} | {_format_number(row.total_volume)} | "
-            f"{row.put_call_volume_ratio:.2f} | {_format_number(row.put_open_interest)} | {_format_number(row.call_open_interest)} | "
-            f"{_format_number(row.total_open_interest)} | {row.put_call_open_interest_ratio:.2f} | "
+            f"{_format_ratio(row.put_call_volume_ratio)} | {_format_number(row.put_open_interest)} | {_format_number(row.call_open_interest)} | "
+            f"{_format_number(row.total_open_interest)} | {_format_ratio(row.put_call_open_interest_ratio)} | "
             f"{_metric_text(row.implied_volatility)} | {row.is_monthly} |"
         )
     return rows
@@ -311,11 +326,11 @@ def _raw_csv(report: SymbolReport, archive_dir: Path) -> Path | None:
                 row.put_volume,
                 row.call_volume,
                 row.total_volume,
-                row.put_call_volume_ratio,
+                _csv_ratio(row.put_call_volume_ratio),
                 row.put_open_interest,
                 row.call_open_interest,
                 row.total_open_interest,
-                row.put_call_open_interest_ratio,
+                _csv_ratio(row.put_call_open_interest_ratio),
                 row.implied_volatility,
                 row.is_monthly,
                 source.name,
