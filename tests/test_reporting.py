@@ -813,3 +813,43 @@ def test_render_reports_escapes_dynamic_html_content(tmp_path: Path) -> None:
     html = bundle.html_path.read_text(encoding="utf-8")
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
+
+
+def test_render_reports_sanitizes_infinite_put_call_ratios(tmp_path: Path) -> None:
+    snapshot = Snapshot(
+        symbol="NOW",
+        url="https://www.barchart.com/stocks/quotes/now/put-call-ratios",
+        captured_at=datetime(2026, 6, 2, 21, 30),
+        metrics=TopMetrics("07/22/26", 30.86, 37.28, 29.62, 39.0),
+        rows=[
+            ExpirationRow(
+                "06/18/26 (m)", date(2026, 6, 18), 16, 1500, 0, 1500,
+                float("inf"), 2000, 0, 2000, float("inf"), 31.92, True,
+            ),
+        ],
+    )
+    analysis = SymbolAnalysis(
+        symbol="NOW",
+        captured_at=snapshot.captured_at,
+        metrics=snapshot.metrics,
+        monthly_signals=[
+            MonthlySignal("2026-06", "06/18/26 (m)", float("inf"), float("inf"), 1500, 2000, Signal.BEARISH_HEDGING)
+        ],
+        commentary="NOW: bearish overall.",
+    )
+    bundle = render_reports(
+        generated_at=datetime(2026, 6, 2, 21, 35),
+        symbol_reports=[SymbolReport(symbol="NOW", snapshot=snapshot, analysis=analysis, drift=[])],
+        archive_dir=tmp_path,
+    )
+
+    html = bundle.html_path.read_text(encoding="utf-8")
+    markdown = bundle.markdown_path.read_text(encoding="utf-8")
+    assert "inf" not in html.lower()
+    assert "inf" not in markdown.lower()
+    assert "—" in html
+
+    with (tmp_path / "NOW-expirations.csv").open(encoding="utf-8", newline="") as file:
+        rows = list(csv.DictReader(file))
+    assert rows[0]["put_call_volume_ratio"] == ""
+    assert rows[0]["put_call_open_interest_ratio"] == ""
