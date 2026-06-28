@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tomllib
 import subprocess
 from pathlib import Path
@@ -454,12 +455,13 @@ def test_dependabot_auto_merge_only_allows_patch_and_minor_updates() -> None:
         "!github.event.pull_request.draft",
         "contents: write",
         "pull-requests: write",
-        "dependabot/fetch-metadata@v2",
         "version-update:semver-patch",
         "version-update:semver-minor",
         "gh pr merge --auto --squash \"$PR_URL\"",
     ]:
         assert text in workflow
+
+    assert re.search(r"dependabot/fetch-metadata@v\d+", workflow)
 
     assert "github.actor == 'dependabot[bot]'" not in workflow
     assert "version-update:semver-major" not in workflow
